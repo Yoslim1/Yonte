@@ -1,10 +1,11 @@
 package com.yonte.feature.notes
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.yonte.core.database.NoteEntity
 import com.yonte.core.database.NoteRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -14,7 +15,10 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-class NotesViewModel(private val repository: NoteRepository) : ViewModel() {
+@HiltViewModel
+class NotesViewModel @Inject constructor(
+    private val repository: NoteRepository,
+) : ViewModel() {
     private val query = MutableStateFlow("")
 
     val notes: StateFlow<List<NoteEntity>> = query
@@ -47,14 +51,5 @@ class NotesViewModel(private val repository: NoteRepository) : ViewModel() {
 
     fun restore(note: NoteEntity) {
         viewModelScope.launch { repository.setTrashed(note.id, false) }
-    }
-
-    companion object {
-        fun factory(repository: NoteRepository): ViewModelProvider.Factory =
-            object : ViewModelProvider.Factory {
-                @Suppress("UNCHECKED_CAST")
-                override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                    NotesViewModel(repository) as T
-            }
     }
 }

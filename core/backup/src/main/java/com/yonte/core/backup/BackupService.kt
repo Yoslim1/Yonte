@@ -7,12 +7,17 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.security.MessageDigest
 
-class BackupService(private val encryptionManager: EncryptionManager) {
+interface BackupGateway {
+    fun exportNotes(resolver: ContentResolver, uri: Uri, notes: List<BackupNote>)
+    fun importNotes(resolver: ContentResolver, uri: Uri): List<BackupNote>
+}
+
+class BackupService(private val encryptionManager: EncryptionManager) : BackupGateway {
     companion object {
         private const val FORMAT_VERSION = 1
     }
 
-    fun exportNotes(resolver: ContentResolver, uri: Uri, notes: List<BackupNote>) {
+    override fun exportNotes(resolver: ContentResolver, uri: Uri, notes: List<BackupNote>) {
         val notesJson = JSONArray().apply {
             notes.forEach { note ->
                 put(JSONObject().apply {
@@ -42,7 +47,7 @@ class BackupService(private val encryptionManager: EncryptionManager) {
             ?: error("Unable to open backup destination")
     }
 
-    fun importNotes(resolver: ContentResolver, uri: Uri): List<BackupNote> {
+    override fun importNotes(resolver: ContentResolver, uri: Uri): List<BackupNote> {
         val envelope = resolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) }
             ?: error("Unable to open backup source")
         val encrypted = android.util.Base64.decode(JSONObject(envelope).getString("payload"), android.util.Base64.DEFAULT)

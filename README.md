@@ -36,7 +36,11 @@ Open the repository in Android Studio with JDK 17, or run:
 ./gradlew :app:assembleDebug
 ```
 
-The GitHub Actions workflow builds the debug APK on every push to `main` and every pull request. Release metadata is published separately in the public `Yoslim1/Yonte-updates` repository because the source repository is private; the app checks that feed only when the user requests an update check.
+The GitHub Actions workflow enforces feature isolation, then builds the debug APK on every push to `main` and every pull request. Hilt owns application composition, while features consume Core interfaces rather than concrete service implementations. Release metadata is published separately in the public `Yoslim1/Yonte-updates` repository because the source repository is private; the app checks that feed only when the user requests an update check.
+
+## Architecture
+
+The mandatory modularization rules are documented in [`docs/FEATURE_ISOLATION_BLUEPRINT.md`](docs/FEATURE_ISOLATION_BLUEPRINT.md). The architecture guard is executable as `python3 tools/check_architecture.py` and must pass before a build is accepted.
 
 ## Data safety
 

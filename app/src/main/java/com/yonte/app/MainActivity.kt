@@ -8,10 +8,19 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.yonte.core.backup.BackupGateway
+import com.yonte.core.database.NoteRepository
 import com.yonte.core.designsystem.YonteTheme
+import com.yonte.core.update.UpdateGateway
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import com.yonte.feature.notes.NotesRoute
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    @Inject lateinit var noteRepository: NoteRepository
+    @Inject lateinit var backupGateway: BackupGateway
+    @Inject lateinit var updateGateway: UpdateGateway
     private var sharedText by mutableStateOf<String?>(null)
     private var darkTheme by mutableStateOf(false)
 
@@ -22,7 +31,9 @@ class MainActivity : ComponentActivity() {
         setContent {
             YonteTheme(darkTheme = darkTheme) {
                 NotesRoute(
-                    repository = (application as YonteApplication).noteRepository,
+                    repository = noteRepository,
+                    backupGateway = backupGateway,
+                    updateGateway = updateGateway,
                     sharedText = sharedText,
                     onSharedTextConsumed = { sharedText = null },
                     darkTheme = darkTheme,

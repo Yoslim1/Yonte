@@ -1,6 +1,5 @@
 package com.yonte.feature.notes
 
-import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -64,40 +63,38 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.yonte.core.backup.BackupGateway
 import com.yonte.core.backup.BackupNote
-import com.yonte.core.backup.BackupService
 import com.yonte.core.database.ArabicNormalizer
 import com.yonte.core.database.NoteEntity
 import com.yonte.core.database.NoteRepository
-import com.yonte.core.security.EncryptionManager
+import com.yonte.core.update.UpdateGateway
 import com.yonte.core.update.UpdateInfo
-import com.yonte.core.update.UpdateService
 import kotlinx.coroutines.launch
 import com.yonte.core.navigation.NotesNavigator
 
 @Composable
 fun NotesRoute(
     repository: NoteRepository,
+    backupGateway: BackupGateway,
+    updateGateway: UpdateGateway,
     sharedText: String? = null,
     onSharedTextConsumed: () -> Unit = {},
     darkTheme: Boolean = false,
     onThemeChanged: (Boolean) -> Unit = {},
     currentVersionCode: Int = 2,
 ) {
-    val vm: NotesViewModel = viewModel(factory = NotesViewModel.factory(repository))
+    val vm: NotesViewModel = hiltViewModel()
     val notes by vm.notes.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val backupService = remember { BackupService(EncryptionManager()) }
-    val updateService = remember { UpdateService(context) }
     var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
     var updateStatus by remember { mutableStateOf("") }
-    var downloadedUpdateUri by remember { mutableStateOf<Uri?>(null) }
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
         if (uri != null) scope.launch {
             runCatching {
-                backupService.exportNotes(context.contentResolver, uri, repository.getAll().map { note ->
+                backupGateway.exportNotes(context.contentResolver, uri, repository.getAll().map { note ->
                     BackupNote(note.id, note.title, note.body, note.isPinned, note.createdAt, note.updatedAt)
                 })
             }.onSuccess { Toast.makeText(context, "Backup exported", Toast.LENGTH_SHORT).show() }
@@ -107,7 +104,7 @@ fun NotesRoute(
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) scope.launch {
             runCatching {
-                backupService.importNotes(context.contentResolver, uri).map { item ->
+                backupGateway.importNotes(context.contentResolver, uri).map { item ->
                     NoteEntity(item.id, item.title, item.body, ArabicNormalizer.normalize("${item.title} ${item.body}"), item.isPinned, false, false, item.createdAt, item.updatedAt)
                 }
             }.onSuccess { restored ->
@@ -139,7 +136,7 @@ fun NotesRoute(
                 onCheckUpdate = {
                     updateStatus = "Checking…"
                     scope.launch {
-                        updateService.checkForUpdate(currentVersionCode)
+                        updateGateway.checkForUpdate(currentVersionCode)
                             .onSuccess { found -> updateInfo = found; updateStatus = if (found == null) "You are up to date" else "Update available" }
                             .onFailure { updateStatus = "Update check failed" }
                     }
@@ -149,8 +146,8 @@ fun NotesRoute(
                 onDownloadUpdate = { info ->
                     updateStatus = "Downloading…"
                     scope.launch {
-                        updateService.downloadAndVerify(info)
-                            .onSuccess { uri -> downloadedUpdateUri = uri; updateStatus = "Verified"; updateService.install(uri) }
+                        updateGateway.downloadAndVerify(info)
+                            .onSuccess { uri -> updateStatus = "Verified"; updateGateway.install(uri) }
                             .onFailure { updateStatus = "Download verification failed" }
                     }
                 },

@@ -42,10 +42,16 @@ internal fun validateUpdateInfo(info: UpdateInfo) {
     require(uri.path.startsWith(TRUSTED_PATH_PREFIX)) { "Untrusted update path" }
 }
 
-class UpdateService(context: Context) {
+interface UpdateGateway {
+    suspend fun checkForUpdate(currentVersionCode: Int): Result<UpdateInfo?>
+    suspend fun downloadAndVerify(info: UpdateInfo): Result<Uri>
+    fun install(uri: Uri)
+}
+
+class UpdateService(context: Context) : UpdateGateway {
     private val context = context.applicationContext
 
-    suspend fun checkForUpdate(currentVersionCode: Int): Result<UpdateInfo?> = withContext(Dispatchers.IO) {
+    override suspend fun checkForUpdate(currentVersionCode: Int): Result<UpdateInfo?> = withContext(Dispatchers.IO) {
         runCatching {
             val connection = (URL(UPDATE_MANIFEST_URL).openConnection() as HttpURLConnection).apply {
                 connectTimeout = 8_000
@@ -74,7 +80,7 @@ class UpdateService(context: Context) {
         }
     }
 
-    suspend fun downloadAndVerify(info: UpdateInfo): Result<Uri> = withContext(Dispatchers.IO) {
+    override suspend fun downloadAndVerify(info: UpdateInfo): Result<Uri> = withContext(Dispatchers.IO) {
         runCatching {
             validateUpdateInfo(info)
             val dir = File(context.cacheDir, "updates").apply { mkdirs() }
@@ -107,7 +113,7 @@ class UpdateService(context: Context) {
         }
     }
 
-    fun install(uri: Uri) {
+    override fun install(uri: Uri) {
         context.startActivity(Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, "application/vnd.android.package-archive")
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
