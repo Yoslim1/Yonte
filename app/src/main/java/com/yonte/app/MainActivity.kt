@@ -27,6 +27,7 @@ class MainActivity : ComponentActivity() {
                     onSharedTextConsumed = { sharedText = null },
                     darkTheme = darkTheme,
                     onThemeChanged = { darkTheme = it },
+                    currentVersionCode = BuildConfig.VERSION_CODE,
                 )
             }
         }

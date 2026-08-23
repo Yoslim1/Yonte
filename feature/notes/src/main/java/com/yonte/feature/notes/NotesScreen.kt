@@ -1,5 +1,6 @@
 package com.yonte.feature.notes
 
+import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -70,6 +71,8 @@ import com.yonte.core.database.ArabicNormalizer
 import com.yonte.core.database.NoteEntity
 import com.yonte.core.database.NoteRepository
 import com.yonte.core.security.EncryptionManager
+import com.yonte.core.update.UpdateInfo
+import com.yonte.core.update.UpdateService
 import kotlinx.coroutines.launch
 import com.yonte.core.navigation.NotesNavigator
 
@@ -80,12 +83,17 @@ fun NotesRoute(
     onSharedTextConsumed: () -> Unit = {},
     darkTheme: Boolean = false,
     onThemeChanged: (Boolean) -> Unit = {},
+    currentVersionCode: Int = 2,
 ) {
     val vm: NotesViewModel = viewModel(factory = NotesViewModel.factory(repository))
     val notes by vm.notes.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val backupService = remember { BackupService(EncryptionManager()) }
+    val updateService = remember { UpdateService(context) }
+    var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
+    var updateStatus by remember { mutableStateOf("") }
+    var downloadedUpdateUri by remember { mutableStateOf<Uri?>(null) }
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
         if (uri != null) scope.launch {
             runCatching {
@@ -128,6 +136,24 @@ fun NotesRoute(
                 onThemeChanged = onThemeChanged,
                 onExport = { exportLauncher.launch("yonte-backup.ynt") },
                 onImport = { importLauncher.launch(arrayOf("application/octet-stream", "application/json", "*/*")) },
+                onCheckUpdate = {
+                    updateStatus = "Checking…"
+                    scope.launch {
+                        updateService.checkForUpdate(currentVersionCode)
+                            .onSuccess { found -> updateInfo = found; updateStatus = if (found == null) "You are up to date" else "Update available" }
+                            .onFailure { updateStatus = "Update check failed" }
+                    }
+                },
+                updateInfo = updateInfo,
+                updateStatus = updateStatus,
+                onDownloadUpdate = { info ->
+                    updateStatus = "Downloading…"
+                    scope.launch {
+                        updateService.downloadAndVerify(info)
+                            .onSuccess { uri -> downloadedUpdateUri = uri; updateStatus = "Verified"; updateService.install(uri) }
+                            .onFailure { updateStatus = "Download verification failed" }
+                    }
+                },
                 onDismiss = { showSettings = false },
             )
         } else if (editorNote != null || editorInitialText != null) {
@@ -308,6 +334,10 @@ private fun SettingsDialog(
     onThemeChanged: (Boolean) -> Unit,
     onExport: () -> Unit,
     onImport: () -> Unit,
+    onCheckUpdate: () -> Unit,
+    updateInfo: UpdateInfo?,
+    updateStatus: String,
+    onDownloadUpdate: (UpdateInfo) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val isArabic = LocalLayoutDirection.current == LayoutDirection.Rtl
@@ -326,6 +356,14 @@ private fun SettingsDialog(
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextButton(onClick = onExport, modifier = Modifier.weight(1f)) { Text(if (isArabic) "تصدير نسخة" else "Export") }
                     TextButton(onClick = onImport, modifier = Modifier.weight(1f)) { Text(if (isArabic) "استيراد نسخة" else "Import") }
+                }
+                Divider()
+                TextButton(onClick = onCheckUpdate, modifier = Modifier.fillMaxWidth()) { Text(if (isArabic) "التحقق من وجود تحديث" else "Check for updates") }
+                if (updateStatus.isNotBlank()) Text(updateStatus, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                updateInfo?.let { info ->
+                    Text(if (isArabic) "إصدار جديد: ${info.versionName}" else "New version: ${info.versionName}", fontWeight = FontWeight.SemiBold)
+                    Text(info.releaseNotes, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    TextButton(onClick = { onDownloadUpdate(info) }, modifier = Modifier.fillMaxWidth()) { Text(if (isArabic) "تنزيل وتثبيت" else "Download and install") }
                 }
             }
         },

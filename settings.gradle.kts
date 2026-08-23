@@ -22,3 +22,5 @@ include(":core:backup")
 include(":core:navigation")
 include(":core:designsystem")
 include(":feature:notes")
+
+include(":core:update")
