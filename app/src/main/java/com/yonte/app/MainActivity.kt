@@ -15,6 +15,7 @@ import com.yonte.core.update.UpdateGateway
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import com.yonte.feature.notes.NotesRoute
+import com.yonte.feature.settings.SettingsRoute
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -23,6 +24,7 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var updateGateway: UpdateGateway
     private var sharedText by mutableStateOf<String?>(null)
     private var darkTheme by mutableStateOf(false)
+    private var showSettings by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -30,16 +32,24 @@ class MainActivity : ComponentActivity() {
         sharedText = intent.sharedText()
         setContent {
             YonteTheme(darkTheme = darkTheme) {
-                NotesRoute(
-                    repository = noteRepository,
-                    backupGateway = backupGateway,
-                    updateGateway = updateGateway,
-                    sharedText = sharedText,
-                    onSharedTextConsumed = { sharedText = null },
-                    darkTheme = darkTheme,
-                    onThemeChanged = { darkTheme = it },
-                    currentVersionCode = BuildConfig.VERSION_CODE,
-                )
+                if (showSettings) {
+                    SettingsRoute(
+                        repository = noteRepository,
+                        backupGateway = backupGateway,
+                        updateGateway = updateGateway,
+                        darkTheme = darkTheme,
+                        onThemeChanged = { darkTheme = it },
+                        currentVersionCode = BuildConfig.VERSION_CODE,
+                        onClose = { showSettings = false },
+                    )
+                } else {
+                    NotesRoute(
+                        repository = noteRepository,
+                        sharedText = sharedText,
+                        onSharedTextConsumed = { sharedText = null },
+                        onOpenSettings = { showSettings = true },
+                    )
+                }
             }
         }
     }

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.4.0 — Knote-inspired UX adaptation with original Yonte implementation
+
+- Reworked the editor flow with a calmer title/body layout and a horizontal plain-text action strip for headings, bullets, tasks, and dividers.
+- Fixed new-note autosave to allocate a stable draft UUID before the first asynchronous save, preventing duplicate rows during fast typing.
+- Replaced the settings dialog with a full-screen sectioned settings flow covering Appearance, Data & backup, and Updates.
+- Moved settings into an isolated `:feature:settings` module; the app root now composes Notes and Settings without feature-to-feature dependencies.
+- Added a short UX adaptation record documenting what was learned from Knote and what was intentionally not copied.
+- Added unit coverage for concrete editor actions; architecture, database, update, and debug build gates pass.
+
 ## 1.3.0 — UX/UI polish and reliable draft autosave
 
 - Added an Android-style right-side drawer in RTL with a cleaner home surface.

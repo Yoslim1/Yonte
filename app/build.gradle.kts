@@ -22,8 +22,8 @@ android {
         applicationId = "com.yonte.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "1.3.0"
+        versionCode = 5
+        versionName = "1.4.0"
     }
 
     buildFeatures {
@@ -64,6 +64,7 @@ dependencies {
     implementation(project(":core:navigation"))
     implementation(project(":core:designsystem"))
     implementation(project(":feature:notes"))
+    implementation(project(":feature:settings"))
     implementation(project(":core:update"))
 
     implementation(libs.androidx.core.ktx)
