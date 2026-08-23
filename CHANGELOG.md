@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.0 — Secure update center
+
+- Added a manual update checker in Settings.
+- Added a public metadata-only update feed; the source repository remains private.
+- Added version comparison, minimum SDK validation, APK download, SHA-256 verification, and Android installer handoff.
+- No background polling, analytics, account, or user-data upload is used.
+
 ## 1.1.0 — V2 flow foundation
 
 - Added a workspace-oriented notes home with pinned and recent sections.

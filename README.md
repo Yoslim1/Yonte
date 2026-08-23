@@ -4,7 +4,7 @@ Yonte is an Android-only personal workspace that starts with fast, private notes
 
 ## Current scope
 
-Yonte V2 focuses on a smooth local notes workspace: title and body editing, Arabic/English-ready UI, RTL, pinning, archiving, trash, visible search, tag filtering, pinned/recent grouping, list/grid presentation, Android share-to-note intents, encrypted backup actions, and a modular foundation for future features.
+Yonte V2 focuses on a smooth local notes workspace: title and body editing, Arabic/English-ready UI, RTL, pinning, archiving, trash, visible search, tag filtering, pinned/recent grouping, list/grid presentation, Android share-to-note intents, encrypted backup actions, and a manual update center that verifies APK SHA-256 before installation.
 
 Yonte targets **Android API 26 and above**. There is no iOS or web product target in this repository.
 
@@ -36,7 +36,7 @@ Open the repository in Android Studio with JDK 17, or run:
 ./gradlew :app:assembleDebug
 ```
 
-The GitHub Actions workflow builds the debug APK on every push to `main` and every pull request.
+The GitHub Actions workflow builds the debug APK on every push to `main` and every pull request. Release metadata is published separately in the public `Yoslim1/Yonte-updates` repository because the source repository is private; the app checks that feed only when the user requests an update check.
 
 ## Data safety
 
