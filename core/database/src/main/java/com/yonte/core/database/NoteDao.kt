@@ -16,6 +16,9 @@ interface NoteDao {
     @Query("SELECT * FROM notes WHERE id = :id LIMIT 1")
     suspend fun getById(id: String): NoteEntity?
 
+    @Query("SELECT * FROM notes ORDER BY updatedAt DESC")
+    suspend fun getAll(): List<NoteEntity>
+
     @Query("SELECT * FROM notes WHERE isTrashed = 0 AND isArchived = 0 AND (title LIKE '%' || :query || '%' OR body LIKE '%' || :query || '%' OR normalizedText LIKE '%' || :query || '%') ORDER BY isPinned DESC, updatedAt DESC")
     suspend fun searchFallback(query: String): List<NoteEntity>
 
@@ -24,6 +27,9 @@ interface NoteDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(note: NoteEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(notes: List<NoteEntity>)
 
     @Update
     suspend fun update(note: NoteEntity)

@@ -1,5 +1,6 @@
 package com.yonte.core.database
 
+import androidx.room.withTransaction
 import androidx.sqlite.db.SimpleSQLiteQuery
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
@@ -25,6 +26,12 @@ class NoteRepository(private val database: YonteDatabase) {
     fun observeActive(): Flow<List<NoteEntity>> = dao.observeActive()
 
     suspend fun get(id: String): NoteEntity? = dao.getById(id)
+
+    suspend fun getAll(): List<NoteEntity> = dao.getAll()
+
+    suspend fun restore(notes: List<NoteEntity>) {
+        database.withTransaction { dao.upsertAll(notes) }
+    }
 
     suspend fun save(id: String?, title: String, body: String): NoteEntity {
         val now = System.currentTimeMillis()

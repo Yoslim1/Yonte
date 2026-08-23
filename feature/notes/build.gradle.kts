@@ -18,9 +18,12 @@ android {
 
 dependencies {
     implementation(project(":core:database"))
+    implementation(project(":core:backup"))
+    implementation(project(":core:security"))
     implementation(project(":core:designsystem"))
     implementation(project(":core:navigation"))
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.kotlinx.coroutines.android)

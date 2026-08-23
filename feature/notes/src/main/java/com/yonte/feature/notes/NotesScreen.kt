@@ -1,5 +1,8 @@
 package com.yonte.feature.notes
 
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -46,9 +49,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -59,8 +64,13 @@ import androidx.compose.ui.unit.sp
 import java.util.Locale
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.yonte.core.backup.BackupNote
+import com.yonte.core.backup.BackupService
+import com.yonte.core.database.ArabicNormalizer
 import com.yonte.core.database.NoteEntity
 import com.yonte.core.database.NoteRepository
+import com.yonte.core.security.EncryptionManager
+import kotlinx.coroutines.launch
 import com.yonte.core.navigation.NotesNavigator
 
 @Composable
@@ -73,6 +83,31 @@ fun NotesRoute(
 ) {
     val vm: NotesViewModel = viewModel(factory = NotesViewModel.factory(repository))
     val notes by vm.notes.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val backupService = remember { BackupService(EncryptionManager()) }
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
+        if (uri != null) scope.launch {
+            runCatching {
+                backupService.exportNotes(context.contentResolver, uri, repository.getAll().map { note ->
+                    BackupNote(note.id, note.title, note.body, note.isPinned, note.createdAt, note.updatedAt)
+                })
+            }.onSuccess { Toast.makeText(context, "Backup exported", Toast.LENGTH_SHORT).show() }
+                .onFailure { Toast.makeText(context, "Backup export failed", Toast.LENGTH_SHORT).show() }
+        }
+    }
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) scope.launch {
+            runCatching {
+                backupService.importNotes(context.contentResolver, uri).map { item ->
+                    NoteEntity(item.id, item.title, item.body, ArabicNormalizer.normalize("${item.title} ${item.body}"), item.isPinned, false, false, item.createdAt, item.updatedAt)
+                }
+            }.onSuccess { restored ->
+                repository.restore(restored)
+                Toast.makeText(context, "Backup imported", Toast.LENGTH_SHORT).show()
+            }.onFailure { Toast.makeText(context, "Backup import failed", Toast.LENGTH_SHORT).show() }
+        }
+    }
     var editorNote by remember { mutableStateOf<NoteEntity?>(null) }
     var editorInitialText by remember { mutableStateOf<String?>(null) }
     var showSettings by remember { mutableStateOf(false) }
@@ -88,7 +123,13 @@ fun NotesRoute(
     val isArabicDevice = Locale.getDefault().language == "ar"
     CompositionLocalProvider(LocalLayoutDirection provides if (isArabicDevice) LayoutDirection.Rtl else LayoutDirection.Ltr) {
         if (showSettings) {
-            SettingsDialog(darkTheme = darkTheme, onThemeChanged = onThemeChanged, onDismiss = { showSettings = false })
+            SettingsDialog(
+                darkTheme = darkTheme,
+                onThemeChanged = onThemeChanged,
+                onExport = { exportLauncher.launch("yonte-backup.ynt") },
+                onImport = { importLauncher.launch(arrayOf("application/octet-stream", "application/json", "*/*")) },
+                onDismiss = { showSettings = false },
+            )
         } else if (editorNote != null || editorInitialText != null) {
         NoteEditor(
             note = editorNote,
@@ -265,6 +306,8 @@ private fun NoteEditor(
 private fun SettingsDialog(
     darkTheme: Boolean,
     onThemeChanged: (Boolean) -> Unit,
+    onExport: () -> Unit,
+    onImport: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val isArabic = LocalLayoutDirection.current == LayoutDirection.Rtl
@@ -280,6 +323,10 @@ private fun SettingsDialog(
                 }
                 Divider()
                 Text(if (isArabic) "البيانات محلية على جهازك" else "Your data stays on this device", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = onExport, modifier = Modifier.weight(1f)) { Text(if (isArabic) "تصدير نسخة" else "Export") }
+                    TextButton(onClick = onImport, modifier = Modifier.weight(1f)) { Text(if (isArabic) "استيراد نسخة" else "Import") }
+                }
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text(if (isArabic) "تم" else "Done") } },
