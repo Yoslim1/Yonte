@@ -5,7 +5,9 @@ from __future__ import annotations
 import concurrent.futures
 import hashlib
 import json
+import re
 import shutil
+import subprocess
 import tempfile
 import urllib.error
 import urllib.request
@@ -13,7 +15,7 @@ import zipfile
 from pathlib import Path
 
 MANIFEST_URL = "https://raw.githubusercontent.com/Yoslim1/Yonte-updates/main/update.json"
-REQUIRED = {"channel", "versionCode", "versionName", "minimumSdk", "sha256", "downloadUrl", "releaseNotes", "publishedAt"}
+REQUIRED = {"channel", "versionCode", "versionName", "minimumSdk", "sha256", "certificateSha256", "downloadUrl", "releaseNotes", "publishedAt"}
 
 
 def fetch(url: str, timeout: int = 15) -> bytes:
@@ -31,6 +33,7 @@ def validate_manifest(raw: bytes) -> dict:
     assert isinstance(value["versionName"], str) and value["versionName"]
     assert isinstance(value["minimumSdk"], int) and value["minimumSdk"] <= 26
     assert len(value["sha256"]) == 64 and all(c in "0123456789abcdef" for c in value["sha256"].lower())
+    assert len(value["certificateSha256"]) == 64 and all(c in "0123456789abcdef" for c in value["certificateSha256"].lower())
     assert value["downloadUrl"].startswith("https://github.com/Yoslim1/Yonte-updates/releases/download/")
     return value
 
@@ -51,6 +54,12 @@ def test_contract_and_real_artifact() -> tuple[dict, bytes]:
             names = set(archive.namelist())
             assert "AndroidManifest.xml" in names
             assert "classes.dex" in names
+        apksigner = "/home/ubuntu/android-sdk/build-tools/35.0.0/apksigner"
+        output = subprocess.check_output([apksigner, "verify", "--print-certs", handle.name], text=True)
+        match = re.search(r"Signer #1 certificate SHA-256 digest: ([0-9a-f:]+)", output, re.IGNORECASE)
+        assert match, output
+        certificate = match.group(1).replace(":", "").lower()
+        assert certificate == manifest["certificateSha256"].lower(), (certificate, manifest["certificateSha256"])
     return manifest, apk
 
 
@@ -69,7 +78,7 @@ def test_corruption_is_detected(manifest: dict, apk: bytes) -> None:
 def test_malformed_manifests() -> None:
     valid = {
         "channel": "stable", "versionCode": 3, "versionName": "1.2.0", "minimumSdk": 26,
-        "sha256": "a" * 64, "downloadUrl": "https://github.com/Yoslim1/Yonte-updates/releases/download/v1.2.0/Yonte-v1.2.0.apk",
+        "sha256": "a" * 64, "certificateSha256": "b" * 64, "downloadUrl": "https://github.com/Yoslim1/Yonte-updates/releases/download/v1.2.0/Yonte-v1.2.0.apk",
         "releaseNotes": "x", "publishedAt": "2026-08-23",
     }
     for key in REQUIRED:
@@ -101,13 +110,20 @@ def main() -> None:
         results = list(pool.map(lambda _: validate_manifest(fetch(MANIFEST_URL)), range(32)))
     assert all(item["versionCode"] == manifest["versionCode"] for item in results)
 
+    # A few concurrent artifact reads exercise the release CDN and checksum path.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+        artifact_hashes = list(pool.map(lambda _: sha256(fetch(manifest["downloadUrl"], timeout=60)), range(3)))
+    assert artifact_hashes == [manifest["sha256"]] * 3
+
     print(json.dumps({
         "status": "PASS",
         "manifest_checks": len(results) + 1,
+        "artifact_downloads": len(artifact_hashes),
         "apk_bytes": len(apk),
         "version_code": manifest["versionCode"],
         "version_name": manifest["versionName"],
         "sha256": manifest["sha256"],
+        "certificate_sha256": manifest["certificateSha256"],
         "corruption_rejected": True,
         "malformed_manifests_rejected": True,
     }, indent=2))
