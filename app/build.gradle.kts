@@ -1,7 +1,15 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+}
+
+val releaseProperties = Properties()
+val releasePropertiesFile = rootProject.file("yonte-release.properties")
+if (releasePropertiesFile.exists()) {
+    releasePropertiesFile.inputStream().use(releaseProperties::load)
 }
 
 android {
@@ -28,8 +36,22 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
 
+    signingConfigs {
+        create("yonteRelease") {
+            if (releasePropertiesFile.exists()) {
+                storeFile = rootProject.file(releaseProperties.getProperty("storeFile"))
+                storePassword = releaseProperties.getProperty("storePassword")
+                keyAlias = releaseProperties.getProperty("keyAlias")
+                keyPassword = releaseProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
-        release { isMinifyEnabled = false }
+        release {
+            isMinifyEnabled = false
+            if (releasePropertiesFile.exists()) signingConfig = signingConfigs.getByName("yonteRelease")
+        }
     }
 }
 

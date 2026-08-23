@@ -12,3 +12,4 @@ core/*/build/
 feature/*/build/
 *.keystore
 *.jks
+yonte-release.properties
