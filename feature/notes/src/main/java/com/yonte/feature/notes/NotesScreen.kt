@@ -146,7 +146,7 @@ fun NotesRoute(
             },
         )
     } else {
-            NotesHome(
+            NotesHomeV2(
                 notes = notes,
             onSearch = vm::search,
             onNew = { editorNote = null; editorInitialText = "" },

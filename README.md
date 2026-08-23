@@ -4,7 +4,7 @@ Yonte is an Android-only personal workspace that starts with fast, private notes
 
 ## Current scope
 
-The first milestone focuses on local notes: title and body editing, Arabic/English-ready UI, pinning, archiving, trash, search, Android share-to-note intents, and a modular foundation for encrypted backup and future features.
+Yonte V2 focuses on a smooth local notes workspace: title and body editing, Arabic/English-ready UI, RTL, pinning, archiving, trash, visible search, tag filtering, pinned/recent grouping, list/grid presentation, Android share-to-note intents, encrypted backup actions, and a modular foundation for future features.
 
 Yonte targets **Android API 26 and above**. There is no iOS or web product target in this repository.
 
