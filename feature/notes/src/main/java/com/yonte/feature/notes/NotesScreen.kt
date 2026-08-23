@@ -26,6 +26,8 @@ import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.Unarchive
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -35,9 +37,11 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,6 +56,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.util.Locale
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.yonte.core.database.NoteEntity
@@ -63,11 +68,14 @@ fun NotesRoute(
     repository: NoteRepository,
     sharedText: String? = null,
     onSharedTextConsumed: () -> Unit = {},
+    darkTheme: Boolean = false,
+    onThemeChanged: (Boolean) -> Unit = {},
 ) {
     val vm: NotesViewModel = viewModel(factory = NotesViewModel.factory(repository))
     val notes by vm.notes.collectAsStateWithLifecycle()
     var editorNote by remember { mutableStateOf<NoteEntity?>(null) }
     var editorInitialText by remember { mutableStateOf<String?>(null) }
+    var showSettings by remember { mutableStateOf(false) }
 
     LaunchedEffect(sharedText) {
         if (!sharedText.isNullOrBlank()) {
@@ -77,7 +85,11 @@ fun NotesRoute(
         }
     }
 
-    if (editorNote != null || editorInitialText != null) {
+    val isArabicDevice = Locale.getDefault().language == "ar"
+    CompositionLocalProvider(LocalLayoutDirection provides if (isArabicDevice) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+        if (showSettings) {
+            SettingsDialog(darkTheme = darkTheme, onThemeChanged = onThemeChanged, onDismiss = { showSettings = false })
+        } else if (editorNote != null || editorInitialText != null) {
         NoteEditor(
             note = editorNote,
             initialText = editorInitialText,
@@ -93,15 +105,17 @@ fun NotesRoute(
             },
         )
     } else {
-        NotesHome(
-            notes = notes,
+            NotesHome(
+                notes = notes,
             onSearch = vm::search,
             onNew = { editorNote = null; editorInitialText = "" },
             onEdit = { editorNote = it },
             onPin = vm::togglePinned,
             onArchive = vm::archive,
             onTrash = vm::trash,
-        )
+                onSettings = { showSettings = true },
+            )
+        }
     }
 }
 
@@ -115,6 +129,7 @@ private fun NotesHome(
     onPin: (NoteEntity) -> Unit,
     onArchive: (NoteEntity) -> Unit,
     onTrash: (NoteEntity) -> Unit,
+    onSettings: () -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
     val isArabic = LocalLayoutDirection.current == LayoutDirection.Rtl
@@ -130,7 +145,7 @@ private fun NotesHome(
                     }
                 },
                 actions = {
-                    IconButton(onClick = {}) { Icon(Icons.Outlined.Settings, contentDescription = labels.settings) }
+                    IconButton(onClick = onSettings) { Icon(Icons.Outlined.Settings, contentDescription = labels.settings) }
                 },
             )
         },
@@ -244,6 +259,31 @@ private fun NoteEditor(
             Text(labels.autosaveHint, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
+}
+
+@Composable
+private fun SettingsDialog(
+    darkTheme: Boolean,
+    onThemeChanged: (Boolean) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val isArabic = LocalLayoutDirection.current == LayoutDirection.Rtl
+    val labels = remember(isArabic) { Labels.arabic.takeIf { isArabic } ?: Labels.english }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(labels.settings) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(if (isArabic) "الوضع الداكن" else "Dark mode")
+                    Switch(checked = darkTheme, onCheckedChange = onThemeChanged)
+                }
+                Divider()
+                Text(if (isArabic) "البيانات محلية على جهازك" else "Your data stays on this device", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(if (isArabic) "تم" else "Done") } },
+    )
 }
 
 private data class Labels(

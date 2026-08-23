@@ -13,17 +13,20 @@ import com.yonte.feature.notes.NotesRoute
 
 class MainActivity : ComponentActivity() {
     private var sharedText by mutableStateOf<String?>(null)
+    private var darkTheme by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         sharedText = intent.sharedText()
         setContent {
-            YonteTheme {
+            YonteTheme(darkTheme = darkTheme) {
                 NotesRoute(
                     repository = (application as YonteApplication).noteRepository,
                     sharedText = sharedText,
                     onSharedTextConsumed = { sharedText = null },
+                    darkTheme = darkTheme,
+                    onThemeChanged = { darkTheme = it },
                 )
             }
         }
