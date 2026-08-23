@@ -1,6 +1,7 @@
 package com.yonte.feature.notes
 
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -44,11 +45,14 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -157,16 +161,12 @@ fun NotesRoute(
         NoteEditor(
             note = editorNote,
             initialText = editorInitialText,
-            onBack = {
+            onLeave = { id, title, body ->
+                vm.saveImmediately(id, title, body)
                 editorNote = null
                 editorInitialText = null
             },
-            onSave = { id, title, body ->
-                vm.save(id, title, body) {
-                    editorNote = null
-                    editorInitialText = null
-                }
-            },
+            onAutoSave = { id, title, body, onSaved -> vm.autosave(id, title, body, onSaved) },
         )
     } else {
             NotesHomeV2(
@@ -185,141 +185,45 @@ fun NotesRoute(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun NotesHome(
-    notes: List<NoteEntity>,
-    onSearch: (String) -> Unit,
-    onNew: () -> Unit,
-    onEdit: (NoteEntity) -> Unit,
-    onPin: (NoteEntity) -> Unit,
-    onArchive: (NoteEntity) -> Unit,
-    onTrash: (NoteEntity) -> Unit,
-    onSettings: () -> Unit,
-) {
-    var query by remember { mutableStateOf("") }
-    val isArabic = LocalLayoutDirection.current == LayoutDirection.Rtl
-    val labels = remember(isArabic) { Labels.arabic.takeIf { isArabic } ?: Labels.english }
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(labels.appName, fontWeight = FontWeight.Bold)
-                        Text(labels.subtitle, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                },
-                actions = {
-                    IconButton(onClick = onSettings) { Icon(Icons.Outlined.Settings, contentDescription = labels.settings) }
-                },
-            )
-        },
-        floatingActionButton = {
-            FloatingActionButton(onClick = onNew, containerColor = MaterialTheme.colorScheme.primaryContainer) {
-                Icon(Icons.Outlined.EditNote, contentDescription = labels.newNote)
-            }
-        },
-    ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp)) {
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it; onSearch(it) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
-                placeholder = { Text(labels.search) },
-                shape = RoundedCornerShape(18.dp),
-            )
-            Spacer(Modifier.height(16.dp))
-            if (notes.isEmpty()) {
-                EmptyNotes(labels = labels, onNew = onNew)
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 96.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    items(notes, key = { it.id }) { note ->
-                        NoteCard(note, labels, onEdit, onPin, onArchive, onTrash)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun EmptyNotes(labels: Labels, onNew: () -> Unit) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
-                Icon(Icons.Outlined.EditNote, contentDescription = null, modifier = Modifier.padding(18.dp).size(44.dp), tint = MaterialTheme.colorScheme.onSecondaryContainer)
-            }
-            Spacer(Modifier.height(16.dp))
-            Text(labels.emptyTitle, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(6.dp))
-            Text(labels.emptyBody, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            TextButton(onClick = onNew) { Text(labels.createFirst) }
-        }
-    }
-}
-
-@Composable
-private fun NoteCard(
-    note: NoteEntity,
-    labels: Labels,
-    onEdit: (NoteEntity) -> Unit,
-    onPin: (NoteEntity) -> Unit,
-    onArchive: (NoteEntity) -> Unit,
-    onTrash: (NoteEntity) -> Unit,
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth().clickable { onEdit(note) },
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)),
-    ) {
-        Column(Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(note.title.ifBlank { labels.untitled }, modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (note.isPinned) Icon(Icons.Outlined.PushPin, contentDescription = labels.unpin, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
-            }
-            if (note.body.isNotBlank()) {
-                Spacer(Modifier.height(6.dp))
-                Text(note.body, maxLines = 3, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant, lineHeight = 22.sp)
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                IconButton(onClick = { onPin(note) }) { Icon(if (note.isPinned) Icons.Outlined.Star else Icons.Outlined.PushPin, contentDescription = labels.pin) }
-                IconButton(onClick = { onArchive(note) }) { Icon(Icons.Outlined.Archive, contentDescription = labels.archive) }
-                IconButton(onClick = { onTrash(note) }) { Icon(Icons.Outlined.DeleteOutline, contentDescription = labels.delete) }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
 private fun NoteEditor(
     note: NoteEntity?,
     initialText: String?,
-    onBack: () -> Unit,
-    onSave: (String?, String, String) -> Unit,
+    onLeave: (String?, String, String) -> Unit,
+    onAutoSave: (String?, String, String, (NoteEntity) -> Unit) -> Unit,
 ) {
     val isArabic = LocalLayoutDirection.current == LayoutDirection.Rtl
     val labels = remember(isArabic) { Labels.arabic.takeIf { isArabic } ?: Labels.english }
+    var draftId by remember(note?.id, initialText) { mutableStateOf(note?.id) }
     var title by remember(note?.id, initialText) { mutableStateOf(note?.title.orEmpty()) }
     var body by remember(note?.id, initialText) { mutableStateOf(note?.body ?: initialText.orEmpty()) }
+    val latestDraftId by rememberUpdatedState(draftId)
+    val latestTitle by rememberUpdatedState(title)
+    val latestBody by rememberUpdatedState(body)
+    var hasLeft by remember(note?.id, initialText) { mutableStateOf(false) }
+    val latestHasLeft by rememberUpdatedState(hasLeft)
+    fun leave() {
+        if (!hasLeft) {
+            hasLeft = true
+            onLeave(draftId, title, body)
+        }
+    }
+    BackHandler(enabled = true, onBack = ::leave)
+    DisposableEffect(note?.id, initialText) {
+        onDispose { if (!latestHasLeft) onLeave(latestDraftId, latestTitle, latestBody) }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(if (note == null) labels.newNote else labels.editNote) },
-                navigationIcon = { TextButton(onClick = onBack) { Text(labels.cancel) } },
-                actions = { TextButton(onClick = { onSave(note?.id, title, body) }) { Text(labels.save, fontWeight = FontWeight.Bold) } },
+                navigationIcon = { TextButton(onClick = ::leave) { Text(labels.cancel) } },
+                actions = { TextButton(onClick = ::leave) { Text(labels.save, fontWeight = FontWeight.Bold) } },
             )
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            OutlinedTextField(value = title, onValueChange = { title = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text(labels.title) }, textStyle = MaterialTheme.typography.titleLarge)
-            OutlinedTextField(value = body, onValueChange = { body = it }, modifier = Modifier.fillMaxWidth().weight(1f), placeholder = { Text(labels.writeHere) }, minLines = 10)
+            OutlinedTextField(value = title, onValueChange = { title = it; onAutoSave(draftId, title, body) { draftId = it.id } }, modifier = Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text(labels.title) }, textStyle = MaterialTheme.typography.titleLarge)
+            OutlinedTextField(value = body, onValueChange = { body = it; onAutoSave(draftId, title, body) { draftId = it.id } }, modifier = Modifier.fillMaxWidth().weight(1f), placeholder = { Text(labels.writeHere) }, minLines = 10)
             Text(labels.autosaveHint, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }

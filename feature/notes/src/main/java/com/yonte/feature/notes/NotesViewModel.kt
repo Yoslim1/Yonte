@@ -6,6 +6,8 @@ import com.yonte.core.database.NoteEntity
 import com.yonte.core.database.NoteRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -20,6 +22,7 @@ class NotesViewModel @Inject constructor(
     private val repository: NoteRepository,
 ) : ViewModel() {
     private val query = MutableStateFlow("")
+    private var draftSaveJob: Job? = null
 
     val notes: StateFlow<List<NoteEntity>> = query
         .debounce(140)
@@ -31,10 +34,23 @@ class NotesViewModel @Inject constructor(
 
     fun search(value: String) { query.value = value }
 
-    fun save(id: String?, title: String, body: String, onSaved: (NoteEntity) -> Unit = {}) {
-        viewModelScope.launch {
+    fun autosave(id: String?, title: String, body: String, onSaved: (NoteEntity) -> Unit = {}) {
+        if (title.isBlank() && body.isBlank()) return
+        draftSaveJob?.cancel()
+        draftSaveJob = viewModelScope.launch {
+            delay(350)
             onSaved(repository.save(id, title, body))
         }
+    }
+
+    fun saveImmediately(id: String?, title: String, body: String, onSaved: (NoteEntity) -> Unit = {}) {
+        draftSaveJob?.cancel()
+        if (title.isBlank() && body.isBlank()) return
+        viewModelScope.launch { onSaved(repository.save(id, title, body)) }
+    }
+
+    fun save(id: String?, title: String, body: String, onSaved: (NoteEntity) -> Unit = {}) {
+        saveImmediately(id, title, body, onSaved)
     }
 
     fun togglePinned(note: NoteEntity) {
@@ -51,5 +67,10 @@ class NotesViewModel @Inject constructor(
 
     fun restore(note: NoteEntity) {
         viewModelScope.launch { repository.setTrashed(note.id, false) }
+    }
+
+    override fun onCleared() {
+        draftSaveJob?.cancel()
+        super.onCleared()
     }
 }

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.3.0 — UX/UI polish and reliable draft autosave
+
+- Added an Android-style right-side drawer in RTL with a cleaner home surface.
+- Replaced the ambiguous list/grid icon toggle with explicit stateful List and Grid chips.
+- Added reliable draft autosave after a short debounce and final save on Back, Cancel, Save, and screen disposal.
+- Preserved one draft identifier after the first autosave to avoid duplicate notes.
+- Removed the unused legacy home implementation.
+- Added a dedicated Yonte Design skill and documented the 2026 design principles.
+
 ## 1.2.0 — Secure update center
 
 - Added a manual update checker in Settings.
