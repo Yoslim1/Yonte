@@ -1,49 +1,24 @@
 package com.yonte.feature.notes
 
-import android.widget.Toast
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Archive
-import androidx.compose.material.icons.outlined.DeleteOutline
-import androidx.compose.material.icons.outlined.EditNote
-import androidx.compose.material.icons.outlined.PushPin
-import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.Star
-import androidx.compose.material.icons.outlined.Unarchive
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Divider
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -55,31 +30,20 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import java.util.Locale
 import java.util.UUID
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.yonte.core.backup.BackupGateway
-import com.yonte.core.backup.BackupNote
-import com.yonte.core.database.ArabicNormalizer
 import com.yonte.core.database.NoteEntity
 import com.yonte.core.database.NoteRepository
-import com.yonte.core.update.UpdateGateway
-import com.yonte.core.update.UpdateInfo
-import kotlinx.coroutines.launch
-import com.yonte.core.navigation.NotesNavigator
 
 @Composable
 fun NotesRoute(
@@ -90,8 +54,6 @@ fun NotesRoute(
 ) {
     val vm: NotesViewModel = hiltViewModel()
     val notes by vm.notes.collectAsStateWithLifecycle()
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     var editorNote by remember { mutableStateOf<NoteEntity?>(null) }
     var editorInitialText by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(sharedText) {
@@ -143,12 +105,20 @@ private fun NoteEditor(
     var draftId by remember(note?.id, initialText) { mutableStateOf(note?.id ?: UUID.randomUUID().toString()) }
     var title by remember(note?.id, initialText) { mutableStateOf(note?.title.orEmpty()) }
     var body by remember(note?.id, initialText) { mutableStateOf(note?.body ?: initialText.orEmpty()) }
+    var isSaved by rememberSaveable(note?.id, initialText) { mutableStateOf(true) }
     val latestDraftId by rememberUpdatedState(draftId)
-
     val latestTitle by rememberUpdatedState(title)
     val latestBody by rememberUpdatedState(body)
     var hasLeft by remember(note?.id, initialText) { mutableStateOf(false) }
     val latestHasLeft by rememberUpdatedState(hasLeft)
+
+    fun saveDraft() {
+        isSaved = false
+        onAutoSave(draftId, title, body) {
+            draftId = it.id
+            isSaved = true
+        }
+    }
     fun leave() {
         if (!hasLeft) {
             hasLeft = true
@@ -161,21 +131,52 @@ private fun NoteEditor(
     }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text(if (note == null) labels.newNote else labels.editNote) },
-                navigationIcon = { TextButton(onClick = ::leave) { Text(labels.cancel) } },
-                actions = { TextButton(onClick = ::leave) { Text(labels.save, fontWeight = FontWeight.Bold) } },
+                title = {
+                    Column {
+                        Text(if (note == null) labels.newNote else labels.editNote, style = MaterialTheme.typography.titleMedium)
+                        Text(if (isSaved) (if (isArabic) "محفوظ محلياً" else "Saved locally") else (if (isArabic) "جارٍ الحفظ…" else "Saving…"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                },
+                navigationIcon = { IconButton(onClick = ::leave) { Icon(Icons.Outlined.Close, contentDescription = labels.cancel) } },
+                actions = { TextButton(onClick = ::leave) { Text(if (isArabic) "تم" else "Done", fontWeight = FontWeight.Bold) } },
             )
         },
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            OutlinedTextField(value = title, onValueChange = { title = it; onAutoSave(draftId, title, body) { draftId = it.id } }, modifier = Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text(labels.title) }, textStyle = MaterialTheme.typography.titleLarge)
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).imePadding().padding(padding).padding(horizontal = 22.dp, vertical = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+        ) {
+            Text(if (isArabic) "مساحة لبدء فكرة" else "A space to begin an idea", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            BasicTextField(
+                value = title,
+                onValueChange = { title = it; saveDraft() },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                textStyle = MaterialTheme.typography.displaySmall.copy(color = MaterialTheme.colorScheme.onBackground),
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                decorationBox = { inner ->
+                    if (title.isBlank()) Text(labels.title, style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f))
+                    inner()
+                },
+            )
             EditorToolbar(isArabic = isArabic) { prefix ->
                 body = appendEditorAction(body, prefix)
-                onAutoSave(draftId, title, body) { draftId = it.id }
+                saveDraft()
             }
-            OutlinedTextField(value = body, onValueChange = { body = it; onAutoSave(draftId, title, body) { draftId = it.id } }, modifier = Modifier.fillMaxWidth().weight(1f), placeholder = { Text(labels.writeHere) }, minLines = 10)
+            BasicTextField(
+                value = body,
+                onValueChange = { body = it; saveDraft() },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 420.dp),
+                textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onBackground),
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                decorationBox = { inner ->
+                    if (body.isBlank()) Text(labels.writeHere, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
+                    inner()
+                },
+            )
             Text(labels.autosaveHint, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }

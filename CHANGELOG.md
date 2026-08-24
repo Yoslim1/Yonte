@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.0 — Yonte 2026 visual redesign
+
+- Rebuilt the notes home around a warm paper-inspired Yonte surface, larger hierarchy, quieter search, a real grid layout, and a single prominent New note action.
+- Reduced card clutter by moving archive, delete, and pin actions into a contextual overflow menu while keeping pinned notes visually distinct.
+- Rebuilt the editor as a borderless writing canvas with a large title, wide body, unified scrolling, IME-safe padding, and a quiet local-save status.
+- Refined settings with a clearer visual identity, icon-led section cards, and a calmer full-screen flow.
+- Added a written Yonte 2026 design direction and updated the Yonte Design skill to prevent fallback to generic Material styling.
+
 ## 1.4.0 — Knote-inspired UX adaptation with original Yonte implementation
 
 - Reworked the editor flow with a calmer title/body layout and a horizontal plain-text action strip for headings, bullets, tasks, and dividers.
