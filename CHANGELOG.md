@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.6.0 — Yonte notes and tasks interaction
+
+- Added a Yonte-native Quick Add bottom sheet with separate Note and Task entry paths.
+- Kept task capture honest and local: a Task starts as a concrete checkable line inside the editor instead of exposing an unimplemented task database.
+- Added a dedicated notes-and-tasks product direction based on the supplied reference documents while preserving the Yonte name, package, local privacy model, and architecture.
+
 ## 1.5.0 — Yonte 2026 visual redesign
 
 - Rebuilt the notes home around a warm paper-inspired Yonte surface, larger hierarchy, quieter search, a real grid layout, and a single prominent New note action.

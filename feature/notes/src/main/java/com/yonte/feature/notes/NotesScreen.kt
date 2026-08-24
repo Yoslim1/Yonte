@@ -81,7 +81,7 @@ fun NotesRoute(
             NotesHomeV2(
                 notes = notes,
             onSearch = vm::search,
-            onNew = { editorNote = null; editorInitialText = "" },
+            onNew = { initialText -> editorNote = null; editorInitialText = initialText },
             onEdit = { editorNote = it },
             onPin = vm::togglePinned,
             onArchive = vm::archive,

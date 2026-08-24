@@ -2,6 +2,7 @@ package com.yonte.feature.notes
 
 import android.text.format.DateUtils
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,6 +24,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.NoteAdd
 import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.GridView
@@ -41,6 +44,8 @@ import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -52,6 +57,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDrawerState
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -62,6 +68,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -79,7 +86,7 @@ private enum class NotesViewMode { LIST, GRID }
 fun NotesHomeV2(
     notes: List<NoteEntity>,
     onSearch: (String) -> Unit,
-    onNew: () -> Unit,
+    onNew: (String) -> Unit,
     onEdit: (NoteEntity) -> Unit,
     onPin: (NoteEntity) -> Unit,
     onArchive: (NoteEntity) -> Unit,
@@ -89,6 +96,7 @@ fun NotesHomeV2(
     var query by rememberSaveable { mutableStateOf("") }
     var selectedTag by rememberSaveable { mutableStateOf<String?>(null) }
     var viewMode by rememberSaveable { mutableStateOf(NotesViewMode.LIST) }
+    var showQuickAdd by rememberSaveable { mutableStateOf(false) }
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val drawerScope = rememberCoroutineScope()
     val isArabic = LocalLayoutDirection.current == LayoutDirection.Rtl
@@ -141,7 +149,7 @@ fun NotesHomeV2(
             containerColor = MaterialTheme.colorScheme.background,
             floatingActionButton = {
                 ExtendedFloatingActionButton(
-                    onClick = onNew,
+                    onClick = { showQuickAdd = true },
                     icon = { Icon(Icons.Outlined.Add, contentDescription = null) },
                     text = { Text(if (isArabic) "ملاحظة جديدة" else "New note") },
                     containerColor = MaterialTheme.colorScheme.primary,
@@ -203,6 +211,51 @@ fun NotesHomeV2(
                 }
             }
         }
+        if (showQuickAdd) {
+            ModalBottomSheet(
+                onDismissRequest = { showQuickAdd = false },
+                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            ) {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp)) {
+                    Text(if (isArabic) "إضافة جديدة" else "Create new", style = MaterialTheme.typography.headlineSmall)
+                    Text(if (isArabic) "ابدأ من الفكرة، وسيتكفل Yonte بالباقي" else "Start with the idea; Yonte handles the rest", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(12.dp))
+                    QuickAddChoice(
+                        title = if (isArabic) "ملاحظة" else "Note",
+                        subtitle = if (isArabic) "مساحة مفتوحة للكتابة" else "An open space for writing",
+                        icon = Icons.Outlined.NoteAdd,
+                        onClick = { showQuickAdd = false; onNew("") },
+                    )
+                    QuickAddChoice(
+                        title = if (isArabic) "مهمة" else "Task",
+                        subtitle = if (isArabic) "سطر قابل للإنجاز داخل ملاحظتك" else "A checkable line inside your note",
+                        icon = Icons.Outlined.CheckCircle,
+                        onClick = { showQuickAdd = false; onNew("- [ ] ") },
+                    )
+                    Spacer(Modifier.height(22.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickAddChoice(title: String, subtitle: String, icon: ImageVector, onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).clickable(onClick = onClick),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+        shape = MaterialTheme.shapes.medium,
+    ) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.size(44.dp)) {
+                Box(contentAlignment = Alignment.Center) { Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer) }
+            }
+            Spacer(Modifier.size(14.dp))
+            Column {
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
     }
 }
 
@@ -261,14 +314,14 @@ private fun SectionHeader(text: String, visible: Boolean) {
 }
 
 @Composable
-private fun EmptyWorkspace(onNew: () -> Unit, isArabic: Boolean) {
+private fun EmptyWorkspace(onNew: (String) -> Unit, isArabic: Boolean) {
     Box(Modifier.fillMaxWidth().padding(vertical = 72.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(if (isArabic) "مساحة جديدة" else "A fresh space", style = MaterialTheme.typography.titleLarge)
             Spacer(Modifier.height(6.dp))
             Text(if (isArabic) "ابدأ بفكرة صغيرة، وسيحفظها Yonte تلقائياً" else "Start small; Yonte saves as you go", color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(12.dp))
-            TextButton(onClick = onNew) { Text(if (isArabic) "أنشئ أول ملاحظة" else "Create your first note") }
+            TextButton(onClick = { onNew("") }) { Text(if (isArabic) "أنشئ أول ملاحظة" else "Create your first note") }
         }
     }
 }
