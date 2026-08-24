@@ -78,7 +78,7 @@ fun NotesRoute(
             onAutoSave = { id, title, body, onSaved -> vm.autosave(id, title, body, onSaved) },
         )
     } else {
-            NotesHomeV2(
+            NotesHomeScreen(
                 notes = notes,
             onSearch = vm::search,
             onNew = { initialText -> editorNote = null; editorInitialText = initialText },
