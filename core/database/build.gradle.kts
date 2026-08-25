@@ -21,5 +21,7 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.sqlcipher.android)
+    implementation(libs.androidx.sqlite)
     testImplementation("junit:junit:4.13.2")
 }

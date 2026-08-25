@@ -17,4 +17,5 @@ android {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.biometric)
+    implementation(libs.argon2kt)
 }
