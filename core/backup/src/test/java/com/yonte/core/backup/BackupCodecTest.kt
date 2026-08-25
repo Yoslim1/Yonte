@@ -16,7 +16,7 @@ class BackupCodecTest {
 
     @Before
     fun setUp() {
-        Argon2Kdf.kdfEngine = { password, salt ->
+        Argon2Kdf.installKdfEngineForTesting { password, salt ->
             MessageDigest.getInstance("SHA-256").apply {
                 update(salt)
                 update(password)
@@ -26,7 +26,7 @@ class BackupCodecTest {
 
     @After
     fun tearDown() {
-        Argon2Kdf.kdfEngine = Argon2Kdf.defaultKdfEngine
+        Argon2Kdf.installKdfEngineForTesting(null)
     }
 
     private val codec = BackupCodec()

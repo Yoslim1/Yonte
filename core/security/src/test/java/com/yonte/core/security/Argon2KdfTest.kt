@@ -18,11 +18,11 @@ class Argon2KdfTest {
 
     @After
     fun restoreRealEngine() {
-        Argon2Kdf.kdfEngine = Argon2Kdf.defaultKdfEngine
+        Argon2Kdf.installKdfEngineForTesting(null)
     }
 
     private fun installDeterministicEngine() {
-        Argon2Kdf.kdfEngine = { password, salt ->
+        Argon2Kdf.installKdfEngineForTesting { password, salt ->
             MessageDigest.getInstance("SHA-256").apply {
                 update(salt)
                 update(password)

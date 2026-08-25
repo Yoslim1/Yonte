@@ -18,10 +18,17 @@ object Argon2Kdf {
 
     // argon2kt ships Android-only native libraries, so plain-JVM unit tests cannot run
     // the real KDF. Production always uses the Argon2id engine below; only tests swap
-    // this seam (restored via defaultKdfEngine), keeping determinism/salt-sensitivity
-    // properties covered on CI while real-Argon2 behavior is exercised by instrumented tests.
+    // this seam (restored via installKdfEngineForTesting(null)), keeping
+    // determinism/salt-sensitivity properties covered on CI while real-Argon2 behavior
+    // is exercised by instrumented tests.
     internal var kdfEngine: (password: ByteArray, salt: ByteArray) -> ByteArray = ::argon2idEngine
-    internal val defaultKdfEngine: (password: ByteArray, salt: ByteArray) -> ByteArray = ::argon2idEngine
+    private val defaultKdfEngine: (password: ByteArray, salt: ByteArray) -> ByteArray = ::argon2idEngine
+
+    /** Test-only hook for JVM unit tests across modules. Pass null to restore the
+     * real Argon2id engine. Never call from production code paths. */
+    fun installKdfEngineForTesting(engine: ((password: ByteArray, salt: ByteArray) -> ByteArray)?) {
+        kdfEngine = engine ?: defaultKdfEngine
+    }
 
     fun deriveNewKey(passphrase: CharArray): DerivedKey {
         val salt = ByteArray(SALT_SIZE).also { SecureRandom().nextBytes(it) }

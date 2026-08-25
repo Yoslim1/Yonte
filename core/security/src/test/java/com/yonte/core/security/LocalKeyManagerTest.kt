@@ -21,7 +21,7 @@ class LocalKeyManagerTest {
 
     @Before
     fun setUp() {
-        Argon2Kdf.kdfEngine = { password, salt ->
+        Argon2Kdf.installKdfEngineForTesting { password, salt ->
             java.security.MessageDigest.getInstance("SHA-256").apply {
                 update(salt)
                 update(password)
@@ -32,7 +32,7 @@ class LocalKeyManagerTest {
 
     @After
     fun tearDown() {
-        Argon2Kdf.kdfEngine = Argon2Kdf.defaultKdfEngine
+        Argon2Kdf.installKdfEngineForTesting(null)
     }
 
     /** Stand-in for the AndroidKeyStore-backed EncryptionManager: a reversible wrap. */
