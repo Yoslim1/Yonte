@@ -18,4 +18,5 @@ dependencies {
     implementation(project(":core:security"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.serialization.json)
+    testImplementation("junit:junit:4.13.2")
 }

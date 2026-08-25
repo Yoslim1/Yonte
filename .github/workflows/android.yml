@@ -36,7 +36,7 @@ jobs:
         run: python3 tools/check_architecture.py
 
       - name: Check Kotlin and compile debug APK
-        run: ./gradlew :core:update:test :core:database:test :core:security:test :feature:notes:test :app:assembleDebug --stacktrace
+        run: ./gradlew :core:update:test :core:database:test :core:security:test :core:backup:test :feature:notes:test :app:assembleDebug --stacktrace
 
       - name: Lint
         run: ./gradlew :app:lintDebug --stacktrace
