@@ -6,6 +6,7 @@ import com.yonte.core.backup.BackupService
 import com.yonte.core.database.NoteRepository
 import com.yonte.core.database.YonteDatabase
 import com.yonte.core.security.EncryptionManager
+import com.yonte.core.security.LocalKeyManager
 import com.yonte.core.update.UpdateGateway
 import com.yonte.core.update.UpdateService
 import dagger.Module
@@ -20,15 +21,29 @@ import javax.inject.Singleton
 object YonteAppModule {
     @Provides
     @Singleton
-    fun provideDatabase(@ApplicationContext context: Context): YonteDatabase = YonteDatabase.get(context)
+    fun provideEncryptionManager(): EncryptionManager = EncryptionManager()
+
+    @Provides
+    @Singleton
+    fun provideLocalKeyManager(
+        @ApplicationContext context: Context,
+        encryptionManager: EncryptionManager,
+    ): LocalKeyManager = LocalKeyManager(context, encryptionManager)
+
+    @Provides
+    @Singleton
+    fun provideDatabase(
+        @ApplicationContext context: Context,
+        localKeyManager: LocalKeyManager,
+    ): YonteDatabase {
+        val key = localKeyManager.cachedSessionKey()
+            ?: error("YonteDatabase requested before onboarding/unlock completed")
+        return YonteDatabase.get(context, key)
+    }
 
     @Provides
     @Singleton
     fun provideNoteRepository(database: YonteDatabase): NoteRepository = NoteRepository(database)
-
-    @Provides
-    @Singleton
-    fun provideEncryptionManager(): EncryptionManager = EncryptionManager()
 
     @Provides
     @Singleton
