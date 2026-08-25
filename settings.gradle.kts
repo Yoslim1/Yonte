@@ -23,5 +23,6 @@ include(":core:navigation")
 include(":core:designsystem")
 include(":feature:notes")
 include(":feature:settings")
+include(":feature:onboarding")
 
 include(":core:update")

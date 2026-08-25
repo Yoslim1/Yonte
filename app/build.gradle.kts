@@ -65,6 +65,7 @@ dependencies {
     implementation(project(":core:designsystem"))
     implementation(project(":feature:notes"))
     implementation(project(":feature:settings"))
+    implementation(project(":feature:onboarding"))
     implementation(project(":core:update"))
 
     implementation(libs.androidx.core.ktx)
