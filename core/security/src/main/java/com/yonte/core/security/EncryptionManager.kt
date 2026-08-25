@@ -9,7 +9,7 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
-class EncryptionManager(private val alias: String = "yonte_backup_key") {
+class EncryptionManager(private val alias: String = "yonte_backup_key") : SessionKeyCipher {
     private val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
 
     private fun getOrCreateKey(): SecretKey {
@@ -27,7 +27,7 @@ class EncryptionManager(private val alias: String = "yonte_backup_key") {
         return generator.generateKey()
     }
 
-    fun encrypt(plain: ByteArray): ByteArray {
+    override fun encrypt(plain: ByteArray): ByteArray {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey())
         val iv = cipher.iv
@@ -39,7 +39,7 @@ class EncryptionManager(private val alias: String = "yonte_backup_key") {
         }.array()
     }
 
-    fun decrypt(payload: ByteArray): ByteArray {
+    override fun decrypt(payload: ByteArray): ByteArray {
         val buffer = ByteBuffer.wrap(payload)
         val iv = ByteArray(buffer.int).also(buffer::get)
         val ciphertext = ByteArray(buffer.remaining()).also(buffer::get)
