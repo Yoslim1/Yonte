@@ -67,8 +67,11 @@ class BackupGatewayWiringTest {
     }
 
     private companion object {
-        private val NULL_RESOLVER: ContentResolver = null as ContentResolver
-        private val NULL_URI: Uri = null as Uri
+        @Suppress("UNCHECKED_CAST")
+        private fun <T> nullAs(): T = null as T
+
+        private val NULL_RESOLVER: ContentResolver = nullAs()
+        private val NULL_URI: Uri = nullAs()
 
         private fun sampleNote(id: String) = BackupNote(id, "title", "body", isPinned = true, createdAt = 1L, updatedAt = 2L)
     }
