@@ -38,8 +38,6 @@ class BackupGatewayWiringTest {
         }
     }
 
-    private fun sampleNote(id: String) = BackupNote(id, "title", "body", isPinned = true, createdAt = 1L, updatedAt = 2L)
-
     @Test
     fun `export goes through the passphrase overload exactly once and never the legacy one`() {
         val gateway = RecordingGateway()
@@ -71,5 +69,7 @@ class BackupGatewayWiringTest {
     private companion object {
         private val NULL_RESOLVER: ContentResolver = null as ContentResolver
         private val NULL_URI: Uri = null as Uri
+
+        private fun sampleNote(id: String) = BackupNote(id, "title", "body", isPinned = true, createdAt = 1L, updatedAt = 2L)
     }
 }
