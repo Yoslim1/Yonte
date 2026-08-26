@@ -7,6 +7,7 @@ import com.yonte.core.backup.BackupNote
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import org.mockito.Mockito.mock
 
 class BackupGatewayWiringTest {
 
@@ -44,7 +45,7 @@ class BackupGatewayWiringTest {
         val notes = listOf(sampleNote("n1"))
         val passphrase = "correct horse battery staple".toCharArray()
 
-        PassphraseBackupFlow.export(gateway, NULL_RESOLVER, NULL_URI, notes, passphrase)
+        PassphraseBackupFlow.export(gateway, FAKE_RESOLVER, FAKE_URI, notes, passphrase)
 
         assertEquals(1, gateway.secureExportCalls)
         assertEquals(0, gateway.legacyExportCalls)
@@ -57,7 +58,7 @@ class BackupGatewayWiringTest {
         val gateway = RecordingGateway()
         val passphrase = "another-passphrase".toCharArray()
 
-        val restored = PassphraseBackupFlow.import(gateway, NULL_RESOLVER, NULL_URI, passphrase)
+        val restored = PassphraseBackupFlow.import(gateway, FAKE_RESOLVER, FAKE_URI, passphrase)
 
         assertEquals(1, gateway.secureImportCalls)
         assertEquals(0, gateway.legacyImportCalls)
@@ -67,11 +68,13 @@ class BackupGatewayWiringTest {
     }
 
     private companion object {
-        @Suppress("UNCHECKED_CAST")
-        private fun <T> nullAs(): T = null as T
-
-        private val NULL_RESOLVER: ContentResolver = nullAs()
-        private val NULL_URI: Uri = nullAs()
+        // Real (non-null) Mockito doubles instead of unchecked null casts: Kotlin
+        // generates a null-check on every non-nullable parameter at the call site,
+        // so passing an actual `null` (even via `as T`) throws NullPointerException
+        // before the fake gateway is ever reached. RecordingGateway never calls a
+        // method on these, so a bare mock with no stubbing is sufficient.
+        private val FAKE_RESOLVER: ContentResolver = mock(ContentResolver::class.java)
+        private val FAKE_URI: Uri = mock(Uri::class.java)
 
         private fun sampleNote(id: String) = BackupNote(id, "title", "body", isPinned = true, createdAt = 1L, updatedAt = 2L)
     }
