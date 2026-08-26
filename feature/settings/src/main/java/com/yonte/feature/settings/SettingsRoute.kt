@@ -1,5 +1,6 @@
 package com.yonte.feature.settings
 
+import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -69,26 +70,30 @@ fun SettingsRoute(
     var section by rememberSaveable { mutableStateOf<SettingsSection?>(null) }
     var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
     var updateStatus by remember { mutableStateOf("") }
+    var showExportPassphraseDialog by remember { mutableStateOf(false) }
+    var showImportPassphraseDialog by remember { mutableStateOf(false) }
+    var pendingExportPassphrase by remember { mutableStateOf<CharArray?>(null) }
+    var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
-        if (uri != null) scope.launch {
-            runCatching {
-                backupGateway.exportNotes(context.contentResolver, uri, repository.getAll().map { note ->
-                    BackupNote(note.id, note.title, note.body, note.isPinned, note.createdAt, note.updatedAt)
-                })
-            }.onSuccess { Toast.makeText(context, if (isArabic) "تم تصدير النسخة" else "Backup exported", Toast.LENGTH_SHORT).show() }
-                .onFailure { Toast.makeText(context, if (isArabic) "فشل تصدير النسخة" else "Backup export failed", Toast.LENGTH_SHORT).show() }
-        }
+        val passphrase = pendingExportPassphrase
+        pendingExportPassphrase = null
+        if (uri != null && passphrase != null) scope.launch {
+            try {
+                runCatching {
+                    PassphraseBackupFlow.export(backupGateway, context.contentResolver, uri, repository.getAll().map { note ->
+                        BackupNote(note.id, note.title, note.body, note.isPinned, note.createdAt, note.updatedAt)
+                    }, passphrase)
+                }.onSuccess { Toast.makeText(context, if (isArabic) "تم تصدير النسخة" else "Backup exported", Toast.LENGTH_SHORT).show() }
+                    .onFailure { Toast.makeText(context, if (isArabic) "فشل تصدير النسخة" else "Backup export failed", Toast.LENGTH_SHORT).show() }
+            } finally {
+                passphrase.fill('\u0000')
+            }
+        } else passphrase?.fill('\u0000')
     }
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) scope.launch {
-            runCatching {
-                backupGateway.importNotes(context.contentResolver, uri).map { item ->
-                    NoteEntity(item.id, item.title, item.body, ArabicNormalizer.normalize("${item.title} ${item.body}"), item.isPinned, false, false, item.createdAt, item.updatedAt)
-                }
-            }.onSuccess { restored ->
-                repository.restore(restored)
-                Toast.makeText(context, if (isArabic) "تم استيراد النسخة" else "Backup imported", Toast.LENGTH_SHORT).show()
-            }.onFailure { Toast.makeText(context, if (isArabic) "فشل استيراد النسخة" else "Backup import failed", Toast.LENGTH_SHORT).show() }
+        if (uri != null) {
+            pendingImportUri = uri
+            showImportPassphraseDialog = true
         }
     }
 
@@ -116,7 +121,7 @@ fun SettingsRoute(
             when (section) {
                 null -> SettingsMenu(isArabic, { section = SettingsSection.APPEARANCE }, { section = SettingsSection.DATA }, { section = SettingsSection.UPDATES })
                 SettingsSection.APPEARANCE -> SettingsAppearance(darkTheme, onThemeChanged, isArabic)
-                SettingsSection.DATA -> SettingsData({ exportLauncher.launch("yonte-backup.ynt") }, { importLauncher.launch(arrayOf("application/octet-stream", "application/json", "*/*")) }, isArabic)
+                SettingsSection.DATA -> SettingsData({ showExportPassphraseDialog = true }, { importLauncher.launch(arrayOf("application/octet-stream", "application/json", "*/*")) }, isArabic)
                 SettingsSection.UPDATES -> SettingsUpdates(
                     status = updateStatus,
                     info = updateInfo,
@@ -140,6 +145,45 @@ fun SettingsRoute(
                 )
             }
         }
+    }
+
+    if (showExportPassphraseDialog) {
+        BackupPassphraseDialog(
+            mode = BackupPassphraseMode.EXPORT,
+            isArabic = isArabic,
+            onConfirm = { passphrase ->
+                showExportPassphraseDialog = false
+                pendingExportPassphrase = passphrase
+                exportLauncher.launch("yonte-backup.ynt")
+            },
+            onDismiss = { showExportPassphraseDialog = false },
+        )
+    }
+    if (showImportPassphraseDialog) {
+        BackupPassphraseDialog(
+            mode = BackupPassphraseMode.IMPORT,
+            isArabic = isArabic,
+            onConfirm = { passphrase ->
+                showImportPassphraseDialog = false
+                val importUri = pendingImportUri
+                pendingImportUri = null
+                if (importUri != null) scope.launch {
+                    try {
+                        runCatching {
+                            PassphraseBackupFlow.import(backupGateway, context.contentResolver, importUri, passphrase).map { item ->
+                                NoteEntity(item.id, item.title, item.body, ArabicNormalizer.normalize("${item.title} ${item.body}"), item.isPinned, false, false, item.createdAt, item.updatedAt)
+                            }
+                        }.onSuccess { restored ->
+                            repository.restore(restored)
+                            Toast.makeText(context, if (isArabic) "تم استيراد النسخة" else "Backup imported", Toast.LENGTH_SHORT).show()
+                        }.onFailure { Toast.makeText(context, if (isArabic) "فشل استيراد النسخة" else "Backup import failed", Toast.LENGTH_SHORT).show() }
+                    } finally {
+                        passphrase.fill('\u0000')
+                    }
+                } else passphrase.fill('\u0000')
+            },
+            onDismiss = { showImportPassphraseDialog = false; pendingImportUri = null },
+        )
     }
 }
 
