@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
  */
 @Composable
 fun OnboardingRoute(
+    isProcessing: Boolean = false,
     onComplete: (passphrase: String) -> Unit,
 ) {
     val isArabic = LocalLayoutDirection.current == LayoutDirection.Rtl
@@ -49,6 +50,7 @@ fun OnboardingRoute(
                 1 -> PrivacyStep(isArabic) { step = 2 }
                 else -> PassphraseStep(
                     isArabic = isArabic,
+                    isProcessing = isProcessing,
                     passphrase = passphrase,
                     confirm = confirm,
                     showMismatch = showMismatch,
@@ -116,6 +118,7 @@ private fun PrivacyStep(isArabic: Boolean, onNext: () -> Unit) {
 @Composable
 private fun PassphraseStep(
     isArabic: Boolean,
+    isProcessing: Boolean = false,
     passphrase: String,
     confirm: String,
     showMismatch: Boolean,
@@ -164,7 +167,19 @@ private fun PassphraseStep(
         modifier = Modifier.fillMaxWidth(),
     )
     Spacer(Modifier.height(32.dp))
-    Button(onClick = onSubmit, modifier = Modifier.fillMaxWidth()) {
-        Text(if (isArabic) "تشفير بياناتي والمتابعة" else "Encrypt my data and continue")
+    Button(
+        onClick = onSubmit,
+        enabled = !isProcessing,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        if (isProcessing) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(20.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.onPrimary,
+            )
+        } else {
+            Text(if (isArabic) "تشفير بياناتي والمتابعة" else "Encrypt my data and continue")
+        }
     }
 }

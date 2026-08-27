@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.lifecycleScope
 import com.yonte.core.backup.BackupGateway
 import com.yonte.core.database.NoteRepository
 import com.yonte.core.designsystem.YonteTheme
@@ -20,6 +21,9 @@ import javax.inject.Inject
 import com.yonte.feature.notes.NotesRoute
 import com.yonte.feature.onboarding.OnboardingRoute
 import com.yonte.feature.settings.SettingsRoute
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -32,6 +36,7 @@ class MainActivity : ComponentActivity() {
     private var showSettings by mutableStateOf(false)
     private var showOnboarding by mutableStateOf(true)
     private var unlocked by mutableStateOf(false)
+    private var isUnlocking by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -45,7 +50,10 @@ class MainActivity : ComponentActivity() {
         setContent {
             YonteTheme(darkTheme = darkTheme) {
                 when {
-                    showOnboarding -> OnboardingRoute(onComplete = ::completeOnboarding)
+                    showOnboarding -> OnboardingRoute(
+                        isProcessing = isUnlocking,
+                        onComplete = ::completeOnboarding,
+                    )
                     unlocked -> NotesOrSettings()
                 }
             }
@@ -53,14 +61,21 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun completeOnboarding(passphrase: String) {
-        val chars = passphrase.toCharArray()
-        try {
-            localKeyManager.setupPassphrase(chars)
-        } finally {
-            chars.fill('\u0000')
+        if (isUnlocking) return // guard against double-submit
+        isUnlocking = true
+        lifecycleScope.launch {
+            val chars = passphrase.toCharArray()
+            try {
+                withContext(Dispatchers.Default) {
+                    localKeyManager.setupPassphrase(chars)
+                }
+            } finally {
+                chars.fill('\u0000')
+            }
+            showOnboarding = false
+            unlocked = true
+            isUnlocking = false
         }
-        showOnboarding = false
-        unlocked = true
     }
 
     @Composable

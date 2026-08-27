@@ -8,10 +8,12 @@ object Argon2Kdf {
     private const val SALT_SIZE = 16
     private const val KEY_SIZE = 32 // 256-bit key for SQLCipher / AES-GCM
     // Tuned for a low/mid-range device (target: ~1-2s on OPPO A9 2020 class hardware).
-    // Verify actual timing on-device before shipping; adjust memoryCostKib downward
-    // first if unlock feels slow, iterations second.
+    // Local-device threat model (theft/extraction, not remote brute force) does not
+    // need the heavier cost. Measured ~7s at 64 MB on OPPO A9 2020; lowered to 19 MB
+    // (verified on-device via TASK 8). If still slow, lower memoryCostKib further
+    // before raising iterations.
     private const val ITERATIONS = 3
-    private const val MEMORY_COST_KIB = 65536 // 64 MB
+    private const val MEMORY_COST_KIB = 19456 // 19 MB
     private const val PARALLELISM = 2
 
     data class DerivedKey(val key: ByteArray, val salt: ByteArray)
