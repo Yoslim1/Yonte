@@ -37,7 +37,7 @@ Feature isolation is enforced by `tools/check_architecture.py` in CI:
 - Core modules must NOT import from `:app` or any `:feature:*` module.
 - Feature build files must NOT declare Gradle dependencies on other feature modules.
 
-Respect these dependency directions. When adding new modules or cross-module references, run the architecture check locally before pushing.
+Respect these dependency directions. The architecture check is authoritative when run in GitHub Actions. Run the Python architecture check locally only when the user explicitly allows local verification; local Gradle and Android build commands remain prohibited under the current policy.
 
 ## Dependency Direction
 
@@ -76,9 +76,9 @@ Respect these dependency directions. When adding new modules or cross-module ref
 | Coroutines | 1.9.0 |
 | Serialization | 1.7.3 |
 
-## Build and Test Commands
+## CI-Only Build and Test Commands
 
-CI runs on GitHub Actions (`.github/workflows/android.yml`). Local Gradle builds are prohibited by project policy unless the user explicitly changes that policy.
+CI runs on GitHub Actions (`.github/workflows/android.yml`). The commands below document what GitHub Actions runs; they are not instructions to run locally. Local Gradle, Android builds, tests, and lint are prohibited unless the user explicitly changes that policy.
 
 **CI verification steps:**
 1. `python3 tools/check_architecture.py` — enforce feature isolation
@@ -154,4 +154,16 @@ The following skills from `~/.config/opencode/skills` are verified installed and
 Do not list every installed skill. Only the ones above are relevant to this project's stack and workflow.
 
 Skills provide specialized instructions and workflows for specific tasks.
-Use the skill tool to load a skill when a task matches its description.
+Use OpenCode's native skill tool to load a relevant skill when a task matches its description. Verify the corresponding SKILL.md when necessary, and never claim that a skill was used unless it was actually loaded and applied.
+
+## Subagent Workflow
+
+For non-trivial software tasks, use this preferred sequence:
+
+`@implementer` → `@reviewer` → `@tester`
+
+The `@implementer` writes the approved change within the requested scope. The `@reviewer` critically reviews the change and uses `clean-code-guard` and `test-guard` when they are installed, read, and relevant. The `@tester` inspects GitHub Actions results and verification evidence without running local Gradle or Android builds.
+
+These names refer to real subagents only when matching agent definitions exist in `.opencode/agents/` or `~/.config/opencode/agents/`. AGENTS.md does not create subagents by itself. If a required subagent is unavailable, report that blocker instead of pretending it was invoked.
+
+The primary agent must not skip a stage without explaining why. No subagent may push, merge, release, deploy, or modify Git history automatically. After five consecutive CI failures for the same task or change, stop and report to the user; do not perform a sixth retry.
