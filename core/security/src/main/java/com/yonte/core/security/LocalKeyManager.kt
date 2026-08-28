@@ -54,6 +54,21 @@ class LocalKeyManager(context: Context, private val cacheManager: SessionKeyCiph
         return runCatching { cacheManager.decrypt(Base64.decode(wrapped, Base64.NO_WRAP)) }.getOrNull()
     }
 
+    /** Clears the session-key cache so the next cold start requires re-authentication. */
+    fun clearSessionCache() {
+        prefs.edit().remove(KEY_SESSION_CACHE).apply()
+    }
+
+    /** Directly caches a raw session key (bypasses EncryptionManager wrapping).
+     * Used after biometric authentication where the key was already unwrapped from
+     * the biometric-bound cipher. */
+    fun cacheSessionKeyDirectly(key: ByteArray) {
+        prefs.edit().putString(
+            KEY_SESSION_CACHE,
+            Base64.encodeToString(cacheManager.encrypt(key), Base64.NO_WRAP),
+        ).apply()
+    }
+
     private fun cacheSessionKey(key: ByteArray) {
         // Wrapped with the existing AndroidKeyStore-backed EncryptionManager so the
         // raw passphrase-derived key never touches disk in plaintext, even for the

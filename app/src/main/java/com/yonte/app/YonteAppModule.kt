@@ -7,6 +7,8 @@ import com.yonte.core.database.NoteRepository
 import com.yonte.core.database.YonteDatabase
 import com.yonte.core.security.EncryptionManager
 import com.yonte.core.security.LocalKeyManager
+import com.yonte.core.security.AppPinManager
+import com.yonte.core.security.BiometricGateCipher
 import com.yonte.core.update.UpdateGateway
 import com.yonte.core.update.UpdateService
 import dagger.Module
@@ -29,6 +31,16 @@ object YonteAppModule {
         @ApplicationContext context: Context,
         encryptionManager: EncryptionManager,
     ): LocalKeyManager = LocalKeyManager(context, encryptionManager)
+
+    @Provides
+    @Singleton
+    fun provideAppPinManager(
+        @ApplicationContext context: Context,
+    ): AppPinManager = AppPinManager(context)
+
+    @Provides
+    @Singleton
+    fun provideBiometricGateCipher(): BiometricGateCipher = BiometricGateCipher()
 
     @Provides
     @Singleton

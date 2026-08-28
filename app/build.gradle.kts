@@ -69,6 +69,7 @@ dependencies {
     implementation(project(":core:update"))
 
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.biometric)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.androidx.activity.compose)
