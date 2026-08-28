@@ -49,7 +49,7 @@ class ScheduledBackupWorker(
         }
     }
 
-    private companion object {
+    internal companion object {
         const val PREFS_NAME = "yonte_auto_backup"
         const val KEY_DESTINATION_URI = "destination_uri"
     }
