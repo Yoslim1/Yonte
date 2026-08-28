@@ -15,6 +15,10 @@ internal object PassphraseBackupFlow {
         gateway.exportNotes(resolver, uri, notes, passphrase)
     }
 
+    fun exportWithKey(gateway: BackupGateway, resolver: ContentResolver, uri: Uri, notes: List<BackupNote>, key: ByteArray, salt: ByteArray) {
+        gateway.exportNotes(resolver, uri, notes, key, salt)
+    }
+
     fun import(gateway: BackupGateway, resolver: ContentResolver, uri: Uri, passphrase: CharArray): List<BackupNote> =
         gateway.importNotes(resolver, uri, passphrase)
 }

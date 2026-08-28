@@ -16,7 +16,10 @@ class BackupGatewayWiringTest {
         var legacyImportCalls = 0
         var secureExportCalls = 0
         var secureImportCalls = 0
+        var keyExportCalls = 0
         var lastSecurePassphrase: CharArray? = null
+        var lastKeyExportKey: ByteArray? = null
+        var lastKeyExportSalt: ByteArray? = null
 
         override fun exportNotes(resolver: ContentResolver, uri: Uri, notes: List<BackupNote>) {
             legacyExportCalls++
@@ -36,6 +39,12 @@ class BackupGatewayWiringTest {
             secureImportCalls++
             lastSecurePassphrase = passphrase.copyOf()
             return listOf(sampleNote("restored"))
+        }
+
+        override fun exportNotes(resolver: ContentResolver, uri: Uri, notes: List<BackupNote>, key: ByteArray, salt: ByteArray) {
+            keyExportCalls++
+            lastKeyExportKey = key.copyOf()
+            lastKeyExportSalt = salt.copyOf()
         }
     }
 
@@ -65,6 +74,23 @@ class BackupGatewayWiringTest {
         assertEquals(0, gateway.legacyExportCalls)
         assertEquals(listOf(sampleNote("restored")), restored)
         assertArrayEquals(passphrase, gateway.lastSecurePassphrase)
+    }
+
+    @Test
+    fun `exportWithKey goes through the key-based overload exactly once`() {
+        val gateway = RecordingGateway()
+        val notes = listOf(sampleNote("n1"))
+        val key = ByteArray(32) { it.toByte() }
+        val salt = ByteArray(16) { (it * 2).toByte() }
+
+        PassphraseBackupFlow.exportWithKey(gateway, FAKE_RESOLVER, FAKE_URI, notes, key, salt)
+
+        assertEquals(1, gateway.keyExportCalls)
+        assertEquals(0, gateway.secureExportCalls)
+        assertEquals(0, gateway.legacyExportCalls)
+        assertEquals(0, gateway.legacyImportCalls)
+        assertArrayEquals(key, gateway.lastKeyExportKey)
+        assertArrayEquals(salt, gateway.lastKeyExportSalt)
     }
 
     private companion object {

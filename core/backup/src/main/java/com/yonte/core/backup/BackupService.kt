@@ -17,6 +17,10 @@ interface BackupGateway {
      * prompt (out of scope for the current task). */
     fun exportNotes(resolver: ContentResolver, uri: Uri, notes: List<BackupNote>, passphrase: CharArray)
     fun importNotes(resolver: ContentResolver, uri: Uri, passphrase: CharArray): List<BackupNote>
+
+    /** Key-based export that reuses the already-derived session key and local salt,
+     * avoiding a redundant Argon2 re-derivation at every export. */
+    fun exportNotes(resolver: ContentResolver, uri: Uri, notes: List<BackupNote>, key: ByteArray, salt: ByteArray)
 }
 
 class BackupService(private val encryptionManager: EncryptionManager) : BackupGateway {
@@ -35,6 +39,10 @@ class BackupService(private val encryptionManager: EncryptionManager) : BackupGa
 
     override fun exportNotes(resolver: ContentResolver, uri: Uri, notes: List<BackupNote>, passphrase: CharArray) {
         writeEnvelope(resolver, uri, notesPayload(notes)) { backupCodec.encrypt(it, passphrase) }
+    }
+
+    override fun exportNotes(resolver: ContentResolver, uri: Uri, notes: List<BackupNote>, key: ByteArray, salt: ByteArray) {
+        writeEnvelope(resolver, uri, notesPayload(notes)) { backupCodec.encryptWithKey(it, key, salt) }
     }
 
     override fun importNotes(resolver: ContentResolver, uri: Uri, passphrase: CharArray): List<BackupNote> =

@@ -63,6 +63,8 @@ fun SettingsRoute(
     onThemeChanged: (Boolean) -> Unit,
     currentVersionCode: Int,
     onClose: () -> Unit,
+    sessionKey: ByteArray? = null,
+    localSalt: ByteArray? = null,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -70,25 +72,25 @@ fun SettingsRoute(
     var section by rememberSaveable { mutableStateOf<SettingsSection?>(null) }
     var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
     var updateStatus by remember { mutableStateOf("") }
-    var showExportPassphraseDialog by remember { mutableStateOf(false) }
     var showImportPassphraseDialog by remember { mutableStateOf(false) }
-    var pendingExportPassphrase by remember { mutableStateOf<CharArray?>(null) }
     var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
-        val passphrase = pendingExportPassphrase
-        pendingExportPassphrase = null
-        if (uri != null && passphrase != null) scope.launch {
+        if (uri != null && sessionKey != null && localSalt != null) scope.launch {
             try {
                 runCatching {
-                    PassphraseBackupFlow.export(backupGateway, context.contentResolver, uri, repository.getAll().map { note ->
+                    PassphraseBackupFlow.exportWithKey(backupGateway, context.contentResolver, uri, repository.getAll().map { note ->
                         BackupNote(note.id, note.title, note.body, note.isPinned, note.createdAt, note.updatedAt)
-                    }, passphrase)
+                    }, sessionKey, localSalt)
                 }.onSuccess { Toast.makeText(context, if (isArabic) "تم تصدير النسخة" else "Backup exported", Toast.LENGTH_SHORT).show() }
                     .onFailure { Toast.makeText(context, if (isArabic) "فشل تصدير النسخة" else "Backup export failed", Toast.LENGTH_SHORT).show() }
             } finally {
-                passphrase.fill('\u0000')
+                // sessionKey is not our copy to clear; it lives in LocalKeyManager
             }
-        } else passphrase?.fill('\u0000')
+        } else if (uri == null) {
+            // user cancelled — no-op
+        } else {
+            Toast.makeText(context, if (isArabic) "فشل تصدير النسخة" else "Backup export failed", Toast.LENGTH_SHORT).show()
+        }
     }
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -121,7 +123,7 @@ fun SettingsRoute(
             when (section) {
                 null -> SettingsMenu(isArabic, { section = SettingsSection.APPEARANCE }, { section = SettingsSection.DATA }, { section = SettingsSection.UPDATES })
                 SettingsSection.APPEARANCE -> SettingsAppearance(darkTheme, onThemeChanged, isArabic)
-                SettingsSection.DATA -> SettingsData({ showExportPassphraseDialog = true }, { importLauncher.launch(arrayOf("application/octet-stream", "application/json", "*/*")) }, isArabic)
+                SettingsSection.DATA -> SettingsData({ exportLauncher.launch("yonte-backup.ynt") }, { importLauncher.launch(arrayOf("application/octet-stream", "application/json", "*/*")) }, isArabic)
                 SettingsSection.UPDATES -> SettingsUpdates(
                     status = updateStatus,
                     info = updateInfo,
@@ -147,18 +149,6 @@ fun SettingsRoute(
         }
     }
 
-    if (showExportPassphraseDialog) {
-        BackupPassphraseDialog(
-            mode = BackupPassphraseMode.EXPORT,
-            isArabic = isArabic,
-            onConfirm = { passphrase ->
-                showExportPassphraseDialog = false
-                pendingExportPassphrase = passphrase
-                exportLauncher.launch("yonte-backup.ynt")
-            },
-            onDismiss = { showExportPassphraseDialog = false },
-        )
-    }
     if (showImportPassphraseDialog) {
         BackupPassphraseDialog(
             mode = BackupPassphraseMode.IMPORT,

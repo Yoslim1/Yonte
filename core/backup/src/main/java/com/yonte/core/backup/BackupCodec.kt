@@ -35,4 +35,18 @@ class BackupCodec {
         cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "AES"), GCMParameterSpec(128, iv))
         return cipher.doFinal(ciphertext)
     }
+
+    /** Encrypt with a pre-derived key and explicit salt. Produces the same wire
+     * format as [encrypt] so import needs no changes. */
+    fun encryptWithKey(plain: ByteArray, key: ByteArray, salt: ByteArray): ByteArray {
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(key, "AES"))
+        val iv = cipher.iv
+        val ciphertext = cipher.doFinal(plain)
+        return ByteBuffer.allocate(4 + salt.size + 4 + iv.size + ciphertext.size).apply {
+            putInt(salt.size); put(salt)
+            putInt(iv.size); put(iv)
+            put(ciphertext)
+        }.array()
+    }
 }

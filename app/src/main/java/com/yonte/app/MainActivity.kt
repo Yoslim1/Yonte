@@ -310,6 +310,8 @@ class MainActivity : ComponentActivity() {
                 onThemeChanged = { darkTheme = it },
                 currentVersionCode = BuildConfig.VERSION_CODE,
                 onClose = { showSettings = false },
+                sessionKey = localKeyManager.cachedSessionKey(),
+                localSalt = localKeyManager.currentSalt(),
             )
         } else {
             NotesRoute(
