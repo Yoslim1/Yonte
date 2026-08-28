@@ -24,50 +24,25 @@ interface BackupGateway {
 }
 
 class BackupService(private val encryptionManager: EncryptionManager) : BackupGateway {
-    companion object {
-        private const val FORMAT_VERSION = 1
-    }
-
     private val backupCodec = BackupCodec()
 
     override fun exportNotes(resolver: ContentResolver, uri: Uri, notes: List<BackupNote>) {
-        writeEnvelope(resolver, uri, notesPayload(notes), encryptionManager::encrypt)
+        writeEnvelope(resolver, uri, buildNotesPayload(notes), encryptionManager::encrypt)
     }
 
     override fun importNotes(resolver: ContentResolver, uri: Uri): List<BackupNote> =
         readEnvelope(resolver, uri, encryptionManager::decrypt)
 
     override fun exportNotes(resolver: ContentResolver, uri: Uri, notes: List<BackupNote>, passphrase: CharArray) {
-        writeEnvelope(resolver, uri, notesPayload(notes)) { backupCodec.encrypt(it, passphrase) }
+        writeEnvelope(resolver, uri, buildNotesPayload(notes)) { backupCodec.encrypt(it, passphrase) }
     }
 
     override fun exportNotes(resolver: ContentResolver, uri: Uri, notes: List<BackupNote>, key: ByteArray, salt: ByteArray) {
-        writeEnvelope(resolver, uri, notesPayload(notes)) { backupCodec.encryptWithKey(it, key, salt) }
+        writeEnvelope(resolver, uri, buildNotesPayload(notes)) { backupCodec.encryptWithKey(it, key, salt) }
     }
 
     override fun importNotes(resolver: ContentResolver, uri: Uri, passphrase: CharArray): List<BackupNote> =
         readEnvelope(resolver, uri) { backupCodec.decrypt(it, passphrase) }
-
-    private fun notesPayload(notes: List<BackupNote>): ByteArray {
-        val notesJson = JSONArray().apply {
-            notes.forEach { note ->
-                put(JSONObject().apply {
-                    put("id", note.id)
-                    put("title", note.title)
-                    put("body", note.body)
-                    put("is_pinned", note.isPinned)
-                    put("created_at", note.createdAt)
-                    put("updated_at", note.updatedAt)
-                })
-            }
-        }
-        return JSONObject().apply {
-            put("format", "ynote-backup")
-            put("schema_version", FORMAT_VERSION)
-            put("created_at", System.currentTimeMillis())
-            put("notes", notesJson)
-        }.toString().toByteArray(Charsets.UTF_8)
-    }
 
     private fun writeEnvelope(
         resolver: ContentResolver,
@@ -75,14 +50,8 @@ class BackupService(private val encryptionManager: EncryptionManager) : BackupGa
         payload: ByteArray,
         encrypt: (ByteArray) -> ByteArray,
     ) {
-        val checksum = sha256(payload)
-        val envelope = JSONObject().apply {
-            put("format", "ynote-backup-encrypted")
-            put("format_version", FORMAT_VERSION)
-            put("checksum", checksum)
-            put("payload", android.util.Base64.encodeToString(encrypt(payload), android.util.Base64.NO_WRAP))
-        }
-        resolver.openOutputStream(uri)?.use { it.write(envelope.toString(2).toByteArray(Charsets.UTF_8)) }
+        val envelope = buildEncryptedEnvelope(payload, encrypt)
+        resolver.openOutputStream(uri)?.use { it.write(envelope.toByteArray(Charsets.UTF_8)) }
             ?: error("Unable to open backup destination")
     }
 
@@ -106,9 +75,46 @@ class BackupService(private val encryptionManager: EncryptionManager) : BackupGa
             }
         }
     }
-
-    private fun sha256(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 }
+
+/** Build the JSON payload containing all notes — shared by interactive export and
+ * [ScheduledBackupWorker]. */
+internal fun buildNotesPayload(notes: List<BackupNote>): ByteArray {
+    val notesJson = JSONArray().apply {
+        notes.forEach { note ->
+            put(JSONObject().apply {
+                put("id", note.id)
+                put("title", note.title)
+                put("body", note.body)
+                put("is_pinned", note.isPinned)
+                put("created_at", note.createdAt)
+                put("updated_at", note.updatedAt)
+            })
+        }
+    }
+    return JSONObject().apply {
+        put("format", "ynote-backup")
+        put("schema_version", 1)
+        put("created_at", System.currentTimeMillis())
+        put("notes", notesJson)
+    }.toString().toByteArray(Charsets.UTF_8)
+}
+
+/** Wrap a plaintext payload into the encrypted envelope format, ready for writing
+ * to disk — shared by interactive export and [ScheduledBackupWorker]. */
+internal fun buildEncryptedEnvelope(payload: ByteArray, encrypt: (ByteArray) -> ByteArray): String {
+    val checksum = sha256(payload)
+    val envelope = JSONObject().apply {
+        put("format", "ynote-backup-encrypted")
+        put("format_version", 1)
+        put("checksum", checksum)
+        put("payload", android.util.Base64.encodeToString(encrypt(payload), android.util.Base64.NO_WRAP))
+    }
+    return envelope.toString(2)
+}
+
+internal fun sha256(bytes: ByteArray): String =
+    MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 
 data class BackupNote(
     val id: String,
