@@ -241,6 +241,7 @@ private fun SettingsAppearance(darkTheme: Boolean, onThemeChanged: (Boolean) -> 
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SettingsData(onExport: () -> Unit, onImport: () -> Unit, isArabic: Boolean) {
     val context = LocalContext.current
