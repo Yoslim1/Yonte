@@ -76,4 +76,30 @@ class LocalKeyManagerTest {
         val reopened = LocalKeyManager(ApplicationProvider.getApplicationContext(), XorSessionKeyCipher())
         assertArrayEquals(setupKey, reopened.cachedSessionKey())
     }
+
+    @Test
+    fun `currentSalt returns null before setup and the salt after`() {
+        assertNull(keyManager.currentSalt())
+        keyManager.setupPassphrase("salt-test".toCharArray())
+        val salt = keyManager.currentSalt()
+        assertEquals(16, salt?.size)
+    }
+
+    @Test
+    fun `unlockMethod defaults to PASSPHRASE`() {
+        assertEquals("PASSPHRASE", keyManager.unlockMethod())
+    }
+
+    @Test
+    fun `setUnlockMethod persists the chosen method`() {
+        keyManager.setUnlockMethod("PIN")
+        assertEquals("PIN", keyManager.unlockMethod())
+    }
+
+    @Test
+    fun `setUnlockMethod persists across manager instances`() {
+        keyManager.setUnlockMethod("BIOMETRIC")
+        val reopened = LocalKeyManager(ApplicationProvider.getApplicationContext(), XorSessionKeyCipher())
+        assertEquals("BIOMETRIC", reopened.unlockMethod())
+    }
 }

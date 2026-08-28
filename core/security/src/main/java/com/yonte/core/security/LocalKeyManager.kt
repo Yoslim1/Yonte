@@ -32,6 +32,19 @@ class LocalKeyManager(context: Context, private val cacheManager: SessionKeyCiph
         return key
     }
 
+    /** Returns the raw salt bytes, or null before first-run setup. */
+    fun currentSalt(): ByteArray? =
+        prefs.getString(KEY_SALT, null)?.let { Base64.decode(it, Base64.NO_WRAP) }
+
+    /** Returns the configured unlock method ("PASSPHRASE", "PIN", or "BIOMETRIC").
+     * Defaults to "PASSPHRASE" for existing installs with no preference set. */
+    fun unlockMethod(): String = prefs.getString(KEY_UNLOCK_METHOD, METHOD_PASSPHRASE)
+        ?: METHOD_PASSPHRASE
+
+    fun setUnlockMethod(method: String) {
+        prefs.edit().putString(KEY_UNLOCK_METHOD, method).apply()
+    }
+
     /** Unwraps the persisted session-key cache written by setupPassphrase/unlock.
      * Returns null before onboarding or when the Keystore-wrapped blob can no longer
      * be decrypted; callers must treat null as "not unlocked" instead of falling back
@@ -54,5 +67,9 @@ class LocalKeyManager(context: Context, private val cacheManager: SessionKeyCiph
     companion object {
         private const val KEY_SALT = "local_key_salt"
         private const val KEY_SESSION_CACHE = "local_key_session_cache"
+        private const val KEY_UNLOCK_METHOD = "unlock_method"
+        internal const val METHOD_PASSPHRASE = "PASSPHRASE"
+        internal const val METHOD_PIN = "PIN"
+        internal const val METHOD_BIOMETRIC = "BIOMETRIC"
     }
 }
