@@ -278,7 +278,7 @@ class MainActivity : ComponentActivity() {
                 Base64.NO_WRAP,
             )
             val cipher = biometricGateCipher.decryptCipher(iv)
-            BiometricPrompt(this, executor).authenticate(
+            BiometricPrompt(this, executor, callback).authenticate(
                 promptInfo,
                 BiometricPrompt.CryptoObject(cipher),
             )

@@ -83,8 +83,8 @@ class LocalKeyManager(context: Context, private val cacheManager: SessionKeyCiph
         private const val KEY_SALT = "local_key_salt"
         private const val KEY_SESSION_CACHE = "local_key_session_cache"
         private const val KEY_UNLOCK_METHOD = "unlock_method"
-        internal const val METHOD_PASSPHRASE = "PASSPHRASE"
-        internal const val METHOD_PIN = "PIN"
-        internal const val METHOD_BIOMETRIC = "BIOMETRIC"
+        const val METHOD_PASSPHRASE = "PASSPHRASE"
+        const val METHOD_PIN = "PIN"
+        const val METHOD_BIOMETRIC = "BIOMETRIC"
     }
 }
