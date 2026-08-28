@@ -9,7 +9,6 @@ import com.yonte.core.database.NoteRepository
 import com.yonte.core.database.YonteDatabase
 import com.yonte.core.security.EncryptionManager
 import com.yonte.core.security.LocalKeyManager
-import com.yonte.core.security.SessionKeyCipher
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
@@ -18,12 +17,17 @@ class ScheduledBackupWorker(
     params: WorkerParameters,
 ) : CoroutineWorker(context, params) {
 
+    /** Test seam: lets tests supply a fake key manager without touching
+     * AndroidKeyStore. Defaults to the production session-key provider. */
+    internal var keyManagerProvider: (Context) -> LocalKeyManager =
+        { LocalKeyManager(it, EncryptionManager()) }
+
     override suspend fun doWork(): Result {
         val prefs = applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val destinationUri = prefs.getString(KEY_DESTINATION_URI, null)
-            ?: return Result.success() // not configured
-        val localKeyManager = LocalKeyManager(applicationContext, EncryptionManager() as SessionKeyCipher)
-        val key = localKeyManager.cachedSessionKey() ?: return Result.success() // not unlocked
+            ?: return Result.success() // not configured, nothing to do
+        val localKeyManager = keyManagerProvider(applicationContext)
+        val key = localKeyManager.cachedSessionKey() ?: return Result.success() // not unlocked this boot, skip quietly
         val salt = localKeyManager.currentSalt() ?: return Result.success()
 
         return try {
@@ -49,7 +53,7 @@ class ScheduledBackupWorker(
         }
     }
 
-    internal companion object {
+    companion object {
         const val PREFS_NAME = "yonte_auto_backup"
         const val KEY_DESTINATION_URI = "destination_uri"
     }

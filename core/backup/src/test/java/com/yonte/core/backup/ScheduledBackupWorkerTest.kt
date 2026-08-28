@@ -5,7 +5,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.work.ListenableWorker
 import androidx.work.WorkerParameters
 import androidx.work.testing.TestListenableWorkerBuilder
-import com.yonte.core.security.EncryptionManager
+import com.yonte.core.security.LocalKeyManager
 import com.yonte.core.security.SessionKeyCipher
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -37,7 +37,13 @@ class ScheduledBackupWorkerTest {
         context.getSharedPreferences(ScheduledBackupWorker.PREFS_NAME, Context.MODE_PRIVATE)
             .edit().putString(ScheduledBackupWorker.KEY_DESTINATION_URI, "content://fake/tree").commit()
         val worker = TestListenableWorkerBuilder<ScheduledBackupWorker>(context).build()
+        worker.keyManagerProvider = { ctx -> LocalKeyManager(ctx, FakeSessionKeyCipher()) }
         val result = worker.startWork().get()
         assertEquals(ListenableWorker.Result.success(), result)
     }
+}
+
+private class FakeSessionKeyCipher : SessionKeyCipher {
+    override fun encrypt(plain: ByteArray): ByteArray = plain
+    override fun decrypt(payload: ByteArray): ByteArray = payload
 }
