@@ -3,7 +3,7 @@ package com.yonte.app
 import android.content.Intent
 import android.os.Bundle
 import android.util.Base64
-import androidx.activity.ComponentActivity
+import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.biometric.BiometricManager
@@ -37,7 +37,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
     @Inject lateinit var noteRepository: Lazy<NoteRepository>
     @Inject lateinit var backupGateway: BackupGateway
     @Inject lateinit var updateGateway: UpdateGateway
