@@ -1,7 +1,6 @@
 ---
 description: Reviews Android Kotlin Compose changes for correctness, security, performance, tests, and scope.
 mode: subagent
-model: opencode/mimo-v2.5-free
 permission:
   read: allow
   edit: ask

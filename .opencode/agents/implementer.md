@@ -1,7 +1,6 @@
 ---
 description: Implements approved Android Kotlin Compose changes within the requested scope.
 mode: subagent
-model: opencode/mimo-v2.5-free
 permission:
   read: allow
   edit: allow

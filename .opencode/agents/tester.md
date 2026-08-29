@@ -1,7 +1,6 @@
 ---
 description: Inspects GitHub Actions and reports CI verification without running local builds.
 mode: subagent
-model: opencode/mimo-v2.5-free
 permission:
   read: allow
   edit: deny
