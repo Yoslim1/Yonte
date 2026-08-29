@@ -15,6 +15,7 @@ import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.yonte.core.backup.BackupGateway
+import com.yonte.core.backup.ScheduledBackupWorker
 import com.yonte.core.database.NoteRepository
 import com.yonte.core.designsystem.YonteTheme
 import com.yonte.core.security.AppPinManager
@@ -96,6 +97,7 @@ class MainActivity : FragmentActivity() {
                             storeBiometricCache()
                             unlockScreen = null
                             unlocked = true
+                            refreshAutoBackupKeyCacheIfEnabled()
                         },
                         onChoosePin = {
                             pinMode = PinFieldMode.CREATE
@@ -105,6 +107,7 @@ class MainActivity : FragmentActivity() {
                             localKeyManager.setUnlockMethod(LocalKeyManager.METHOD_PASSPHRASE)
                             unlockScreen = null
                             unlocked = true
+                            refreshAutoBackupKeyCacheIfEnabled()
                         },
                     )
                     unlockScreen == UnlockScreen.PASSPHRASE -> PassphraseUnlockRoute(
@@ -173,6 +176,7 @@ class MainActivity : FragmentActivity() {
                 }
                 unlockScreen = null
                 unlocked = true
+                refreshAutoBackupKeyCacheIfEnabled()
             } catch (_: Exception) {
                 unlockErrorMessage = if (isArabic()) "كلمة السر غلط" else "Wrong passphrase"
             } finally {
@@ -203,6 +207,7 @@ class MainActivity : FragmentActivity() {
                     createdPin = null
                     unlockScreen = null
                     unlocked = true
+                    refreshAutoBackupKeyCacheIfEnabled()
                 }
             }
         } else {
@@ -296,6 +301,16 @@ class MainActivity : FragmentActivity() {
             .putString("cache_iv", Base64.encodeToString(iv, Base64.NO_WRAP))
             .putString("cache_data", Base64.encodeToString(encrypted, Base64.NO_WRAP))
             .apply()
+    }
+
+    /** Repopulates the auto-backup key cache after a successful interactive unlock,
+     * but only when automatic backup is configured. No-op otherwise, so users who
+     * never enable the feature expose no extra resident key. */
+    private fun refreshAutoBackupKeyCacheIfEnabled() {
+        val prefs = getSharedPreferences(ScheduledBackupWorker.PREFS_NAME, MODE_PRIVATE)
+        if (prefs.getString(ScheduledBackupWorker.KEY_DESTINATION_URI, null) == null) return
+        val key = localKeyManager.cachedSessionKey() ?: return
+        localKeyManager.cacheAutoBackupKey(key)
     }
 
     @Composable

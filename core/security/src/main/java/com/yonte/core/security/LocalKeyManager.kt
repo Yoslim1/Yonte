@@ -79,9 +79,29 @@ class LocalKeyManager(context: Context, private val cacheManager: SessionKeyCiph
         ).apply()
     }
 
+    /** Caches the session key separately for ScheduledBackupWorker. Deliberately not
+     * cleared by [clearSessionCache] so headless scheduled backups can run without the
+     * user present; only populated when automatic backup is enabled. */
+    fun cacheAutoBackupKey(key: ByteArray) {
+        prefs.edit().putString(
+            KEY_AUTO_BACKUP_CACHE,
+            Base64.encodeToString(cacheManager.encrypt(key), Base64.NO_WRAP),
+        ).apply()
+    }
+
+    fun cachedAutoBackupKey(): ByteArray? {
+        val wrapped = prefs.getString(KEY_AUTO_BACKUP_CACHE, null) ?: return null
+        return runCatching { cacheManager.decrypt(Base64.decode(wrapped, Base64.NO_WRAP)) }.getOrNull()
+    }
+
+    fun clearAutoBackupKey() {
+        prefs.edit().remove(KEY_AUTO_BACKUP_CACHE).apply()
+    }
+
     companion object {
         private const val KEY_SALT = "local_key_salt"
         private const val KEY_SESSION_CACHE = "local_key_session_cache"
+        private const val KEY_AUTO_BACKUP_CACHE = "local_key_auto_backup_cache"
         private const val KEY_UNLOCK_METHOD = "unlock_method"
         const val METHOD_PASSPHRASE = "PASSPHRASE"
         const val METHOD_PIN = "PIN"
