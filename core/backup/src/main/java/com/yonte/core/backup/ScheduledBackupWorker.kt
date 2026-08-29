@@ -27,7 +27,7 @@ class ScheduledBackupWorker(
         val destinationUri = prefs.getString(KEY_DESTINATION_URI, null)
             ?: return Result.success() // not configured, nothing to do
         val localKeyManager = keyManagerProvider(applicationContext)
-        val key = localKeyManager.cachedSessionKey() ?: return Result.success() // not unlocked this boot, skip quietly
+        val key = localKeyManager.cachedAutoBackupKey() ?: return Result.success() // auto-backup key not cached this boot, skip quietly
         val salt = localKeyManager.currentSalt() ?: return Result.success()
 
         return try {

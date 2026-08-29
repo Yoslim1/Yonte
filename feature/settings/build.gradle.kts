@@ -20,6 +20,7 @@ dependencies {
     implementation(project(":core:database"))
     implementation(project(":core:backup"))
     implementation(project(":core:update"))
+    implementation(project(":core:security"))
     implementation(project(":core:designsystem"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

@@ -223,6 +223,7 @@ class MainActivity : FragmentActivity() {
                 }
                 unlockScreen = null
                 unlocked = true
+                refreshAutoBackupKeyCacheIfEnabled()
             } else {
                 val remaining = appPinManager.lockoutSecondsRemaining()
                 unlockErrorMessage = if (remaining > 0) {
@@ -252,6 +253,7 @@ class MainActivity : FragmentActivity() {
                         localKeyManager.cacheSessionKeyDirectly(sessionKey)
                         unlockScreen = null
                         unlocked = true
+                        refreshAutoBackupKeyCacheIfEnabled()
                     } else {
                         unlockErrorMessage = if (isArabic()) "فشل فتح القفل" else "Unlock failed"
                     }
@@ -325,6 +327,7 @@ class MainActivity : FragmentActivity() {
                 onThemeChanged = { darkTheme = it },
                 currentVersionCode = BuildConfig.VERSION_CODE,
                 onClose = { showSettings = false },
+                localKeyManager = localKeyManager,
                 sessionKey = localKeyManager.cachedSessionKey(),
                 localSalt = localKeyManager.currentSalt(),
             )

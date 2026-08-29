@@ -57,6 +57,7 @@ import com.yonte.core.backup.ScheduledBackupWorker
 import com.yonte.core.database.ArabicNormalizer
 import com.yonte.core.database.NoteEntity
 import com.yonte.core.database.NoteRepository
+import com.yonte.core.security.LocalKeyManager
 import com.yonte.core.update.UpdateGateway
 import com.yonte.core.update.UpdateInfo
 import kotlinx.coroutines.Dispatchers
@@ -75,6 +76,7 @@ fun SettingsRoute(
     onThemeChanged: (Boolean) -> Unit,
     currentVersionCode: Int,
     onClose: () -> Unit,
+    localKeyManager: LocalKeyManager,
     sessionKey: ByteArray? = null,
     localSalt: ByteArray? = null,
 ) {
@@ -312,7 +314,9 @@ private fun SettingsData(onExport: () -> Unit, onImport: () -> Unit, isArabic: B
                             prefs.edit().putString(KEY_FREQUENCY, entry.name).apply()
                             AutoBackupScheduler.schedule(context, entry)
                             frequencyExpanded = false
-                            if (entry != BackupFrequency.OFF && destinationUri != null) {
+                            if (entry == BackupFrequency.OFF) {
+                                localKeyManager.clearAutoBackupKey()
+                            } else if (destinationUri != null) {
                                 scope.launch { backupSizeBytes = calculateBackupSize(context, Uri.parse(destinationUri)) }
                             }
                         },

@@ -102,4 +102,29 @@ class LocalKeyManagerTest {
         val reopened = LocalKeyManager(ApplicationProvider.getApplicationContext(), XorSessionKeyCipher())
         assertEquals("BIOMETRIC", reopened.unlockMethod())
     }
+
+    @Test
+    fun `auto backup key round-trips and is independent of the session cache`() {
+        val setupKey = keyManager.setupPassphrase("auto-backup-key".toCharArray())
+        keyManager.cacheAutoBackupKey(setupKey)
+        assertArrayEquals(setupKey, keyManager.cachedAutoBackupKey())
+
+        // Clearing the session cache must not evict the auto-backup key, so
+        // headless scheduled backups can still run without the user present.
+        keyManager.clearSessionCache()
+        assertArrayEquals(setupKey, keyManager.cachedAutoBackupKey())
+
+        val reopened = LocalKeyManager(ApplicationProvider.getApplicationContext(), XorSessionKeyCipher())
+        assertArrayEquals(setupKey, reopened.cachedAutoBackupKey())
+    }
+
+    @Test
+    fun `clearAutoBackupKey removes only the auto backup key`() {
+        val setupKey = keyManager.setupPassphrase("auto-backup-clear".toCharArray())
+        keyManager.cacheAutoBackupKey(setupKey)
+        keyManager.clearAutoBackupKey()
+        assertNull(keyManager.cachedAutoBackupKey())
+        // The session cache is untouched and still recoverable.
+        assertArrayEquals(setupKey, keyManager.cachedSessionKey())
+    }
 }
