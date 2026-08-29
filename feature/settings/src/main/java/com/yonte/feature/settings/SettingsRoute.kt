@@ -140,6 +140,7 @@ fun SettingsRoute(
                 SettingsSection.DATA -> SettingsData(
                     onExport = { exportLauncher.launch("yonte-backup.ynt") },
                     onImport = { importLauncher.launch(arrayOf("application/octet-stream", "application/json", "*/*")) },
+                    localKeyManager = localKeyManager,
                     isArabic = isArabic,
                 )
                 SettingsSection.UPDATES -> SettingsUpdates(
@@ -245,7 +246,7 @@ private fun SettingsAppearance(darkTheme: Boolean, onThemeChanged: (Boolean) -> 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SettingsData(onExport: () -> Unit, onImport: () -> Unit, isArabic: Boolean) {
+private fun SettingsData(onExport: () -> Unit, onImport: () -> Unit, localKeyManager: LocalKeyManager, isArabic: Boolean) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val prefs = remember { context.getSharedPreferences(ScheduledBackupWorker.PREFS_NAME, Context.MODE_PRIVATE) }
