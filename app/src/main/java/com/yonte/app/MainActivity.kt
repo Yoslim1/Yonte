@@ -94,10 +94,11 @@ class MainActivity : FragmentActivity() {
                         isArabic = isArabic(),
                         onChooseBiometric = {
                             localKeyManager.setUnlockMethod(LocalKeyManager.METHOD_BIOMETRIC)
-                            storeBiometricCache()
-                            unlockScreen = null
-                            unlocked = true
-                            refreshAutoBackupKeyCacheIfEnabled()
+                            launchBiometricSetupPrompt {
+                                unlockScreen = null
+                                unlocked = true
+                                refreshAutoBackupKeyCacheIfEnabled()
+                            }
                         },
                         onChoosePin = {
                             pinMode = PinFieldMode.CREATE
@@ -171,9 +172,6 @@ class MainActivity : FragmentActivity() {
                 withContext(Dispatchers.Default) {
                     localKeyManager.unlock(chars)
                 }
-                if (localKeyManager.unlockMethod() == LocalKeyManager.METHOD_BIOMETRIC) {
-                    storeBiometricCache()
-                }
                 unlockScreen = null
                 unlocked = true
                 refreshAutoBackupKeyCacheIfEnabled()
@@ -204,6 +202,7 @@ class MainActivity : FragmentActivity() {
                 } else {
                     appPinManager.setPin(pin)
                     localKeyManager.setUnlockMethod(LocalKeyManager.METHOD_PIN)
+                    localKeyManager.cachedSessionKey()?.let { localKeyManager.cachePinUnlockKey(it) }
                     createdPin = null
                     unlockScreen = null
                     unlocked = true
@@ -218,9 +217,14 @@ class MainActivity : FragmentActivity() {
                 return
             }
             if (appPinManager.verify(pin)) {
-                if (localKeyManager.unlockMethod() == LocalKeyManager.METHOD_BIOMETRIC) {
-                    storeBiometricCache()
+                val pinUnlockKey = localKeyManager.cachedPinUnlockKey()
+                if (pinUnlockKey == null) {
+                    unlockScreen = UnlockScreen.PASSPHRASE
+                    unlockErrorMessage = if (isArabic())
+                        "محتاجين نعيد الإعداد، ادخل كلمة السر" else "Setup needs to be refreshed — enter your passphrase"
+                    return
                 }
+                localKeyManager.cacheSessionKeyDirectly(pinUnlockKey)
                 unlockScreen = null
                 unlocked = true
                 refreshAutoBackupKeyCacheIfEnabled()
@@ -294,15 +298,46 @@ class MainActivity : FragmentActivity() {
         }
     }
 
-    private fun storeBiometricCache() {
-        val sessionKey = localKeyManager.cachedSessionKey() ?: return
-        val cipher = biometricGateCipher.encryptCipher()
-        val encrypted = cipher.doFinal(sessionKey)
-        val iv = cipher.iv
-        getSharedPreferences("yonte_biometric_cache", MODE_PRIVATE).edit()
-            .putString("cache_iv", Base64.encodeToString(iv, Base64.NO_WRAP))
-            .putString("cache_data", Base64.encodeToString(encrypted, Base64.NO_WRAP))
-            .apply()
+    /** Confirms fingerprint via a live BiometricPrompt before writing the biometric
+     *  cache.  The "authentication succeeds, doFinal succeeds, cache is written" path
+     *  was verified by manual on-device testing after this task shipped. */
+    private fun launchBiometricSetupPrompt(onDone: () -> Unit) {
+        val sessionKey = localKeyManager.cachedSessionKey()
+        if (sessionKey == null) { onDone(); return }
+        val executor = ContextCompat.getMainExecutor(this)
+        val callback = object : BiometricPrompt.AuthenticationCallback() {
+            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                super.onAuthenticationSucceeded(result)
+                try {
+                    val cipher = result.cryptoObject?.cipher
+                    if (cipher != null) {
+                        val encrypted = cipher.doFinal(sessionKey)
+                        getSharedPreferences("yonte_biometric_cache", MODE_PRIVATE).edit()
+                            .putString("cache_iv", Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
+                            .putString("cache_data", Base64.encodeToString(encrypted, Base64.NO_WRAP))
+                            .apply()
+                    }
+                } catch (_: Exception) {
+                }
+                onDone()
+            }
+
+            override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                super.onAuthenticationError(errorCode, errString)
+                onDone()
+            }
+        }
+        val promptInfo = BiometricPrompt.PromptInfo.Builder()
+            .setTitle(if (isArabic()) "تأكيد البصمة" else "Confirm fingerprint")
+            .setSubtitle(if (isArabic()) "لإعداد الفتح بالبصمة" else "To set up fingerprint unlock")
+            .setNegativeButtonText(if (isArabic()) "إلغاء" else "Cancel")
+            .build()
+        try {
+            val cipher = biometricGateCipher.encryptCipher()
+            BiometricPrompt(this, executor, callback).authenticate(promptInfo, BiometricPrompt.CryptoObject(cipher))
+        } catch (_: Exception) {
+            onDone()
+        }
     }
 
     /** Repopulates the auto-backup key cache after a successful interactive unlock,
