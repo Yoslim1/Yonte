@@ -127,4 +127,29 @@ class LocalKeyManagerTest {
         // The session cache is untouched and still recoverable.
         assertArrayEquals(setupKey, keyManager.cachedSessionKey())
     }
+
+    @Test
+    fun `pin unlock key round-trips and is independent of the session cache`() {
+        val setupKey = keyManager.setupPassphrase("pin-unlock-key".toCharArray())
+        keyManager.cachePinUnlockKey(setupKey)
+        assertArrayEquals(setupKey, keyManager.cachedPinUnlockKey())
+
+        // Clearing the session cache must not evict the PIN unlock key, so a
+        // cold-start PIN re-entry can still restore the real database key.
+        keyManager.clearSessionCache()
+        assertArrayEquals(setupKey, keyManager.cachedPinUnlockKey())
+
+        val reopened = LocalKeyManager(ApplicationProvider.getApplicationContext(), XorSessionKeyCipher())
+        assertArrayEquals(setupKey, reopened.cachedPinUnlockKey())
+    }
+
+    @Test
+    fun `clearPinUnlockKey removes only the pin unlock key`() {
+        val setupKey = keyManager.setupPassphrase("pin-unlock-clear".toCharArray())
+        keyManager.cachePinUnlockKey(setupKey)
+        keyManager.clearPinUnlockKey()
+        assertNull(keyManager.cachedPinUnlockKey())
+        // The session cache is untouched and still recoverable.
+        assertArrayEquals(setupKey, keyManager.cachedSessionKey())
+    }
 }
