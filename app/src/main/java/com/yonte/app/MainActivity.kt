@@ -36,6 +36,11 @@ import com.yonte.feature.settings.SettingsRoute
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 
 @AndroidEntryPoint
 class MainActivity : FragmentActivity() {
@@ -56,8 +61,20 @@ class MainActivity : FragmentActivity() {
     private var createdPin by mutableStateOf<CharArray?>(null)
     private var pinMode by mutableStateOf(PinFieldMode.VERIFY)
     private var unlockErrorMessage by mutableStateOf<String?>(null)
+    private var isWarmingDatabase by mutableStateOf(false)
 
     private enum class UnlockScreen { SETUP, PASSPHRASE, PIN, BIOMETRIC }
+
+    private fun onUnlocked() {
+        unlocked = true
+        isWarmingDatabase = true
+        lifecycleScope.launch {
+            withContext(Dispatchers.IO) {
+                runCatching { noteRepository.get() }
+            }
+            isWarmingDatabase = false
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -96,7 +113,7 @@ class MainActivity : FragmentActivity() {
                             localKeyManager.setUnlockMethod(LocalKeyManager.METHOD_BIOMETRIC)
                             launchBiometricSetupPrompt {
                                 unlockScreen = null
-                                unlocked = true
+                                onUnlocked()
                                 refreshAutoBackupKeyCacheIfEnabled()
                             }
                         },
@@ -107,7 +124,7 @@ class MainActivity : FragmentActivity() {
                         onSkip = {
                             localKeyManager.setUnlockMethod(LocalKeyManager.METHOD_PASSPHRASE)
                             unlockScreen = null
-                            unlocked = true
+                            onUnlocked()
                             refreshAutoBackupKeyCacheIfEnabled()
                         },
                     )
@@ -131,10 +148,13 @@ class MainActivity : FragmentActivity() {
                         errorMessage = unlockErrorMessage,
                         onTriggerBiometric = ::launchBiometricPrompt,
                         onUseFallbackInstead = {
-                            unlockScreen = UnlockScreen.PIN
+                            unlockScreen = if (appPinManager.isPinSet()) UnlockScreen.PIN else UnlockScreen.PASSPHRASE
                             unlockErrorMessage = null
                         },
                     )
+                    unlocked && isWarmingDatabase -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
                     unlocked -> NotesOrSettings()
                 }
             }
@@ -173,7 +193,7 @@ class MainActivity : FragmentActivity() {
                     localKeyManager.unlock(chars)
                 }
                 unlockScreen = null
-                unlocked = true
+                onUnlocked()
                 refreshAutoBackupKeyCacheIfEnabled()
             } catch (_: Exception) {
                 unlockErrorMessage = if (isArabic()) "كلمة السر غلط" else "Wrong passphrase"
@@ -205,7 +225,7 @@ class MainActivity : FragmentActivity() {
                     localKeyManager.cachedSessionKey()?.let { localKeyManager.cachePinUnlockKey(it) }
                     createdPin = null
                     unlockScreen = null
-                    unlocked = true
+                    onUnlocked()
                     refreshAutoBackupKeyCacheIfEnabled()
                 }
             }
@@ -226,7 +246,7 @@ class MainActivity : FragmentActivity() {
                 }
                 localKeyManager.cacheSessionKeyDirectly(pinUnlockKey)
                 unlockScreen = null
-                unlocked = true
+                onUnlocked()
                 refreshAutoBackupKeyCacheIfEnabled()
             } else {
                 val remaining = appPinManager.lockoutSecondsRemaining()
@@ -256,7 +276,7 @@ class MainActivity : FragmentActivity() {
                         val sessionKey = cryptoCipher.doFinal(encryptedData)
                         localKeyManager.cacheSessionKeyDirectly(sessionKey)
                         unlockScreen = null
-                        unlocked = true
+                        onUnlocked()
                         refreshAutoBackupKeyCacheIfEnabled()
                     } else {
                         unlockErrorMessage = if (isArabic()) "فشل فتح القفل" else "Unlock failed"
