@@ -185,7 +185,10 @@ fun SettingsRoute(
                         }.onSuccess { restored ->
                             repository.restore(restored)
                             Toast.makeText(context, if (isArabic) "تم استيراد النسخة" else "Backup imported", Toast.LENGTH_SHORT).show()
-                        }.onFailure { Toast.makeText(context, if (isArabic) "فشل استيراد النسخة" else "Backup import failed", Toast.LENGTH_SHORT).show() }
+                        }.onFailure { e ->
+                            android.util.Log.e("YonteBackupImport", "Import failed", e)
+                            Toast.makeText(context, if (isArabic) "فشل استيراد النسخة" else "Backup import failed", Toast.LENGTH_SHORT).show()
+                        }
                     } finally {
                         passphrase.fill('\u0000')
                     }
