@@ -12,7 +12,6 @@ import com.yonte.core.update.UpdateGateway
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
-import org.mockito.MockedStatic
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.mockStatic
 import org.mockito.Mockito.verify
@@ -64,10 +63,12 @@ class SettingsViewModelTest {
         val viewModel = createViewModel()
         val contentResolver = mock(ContentResolver::class.java)
 
-        viewModel.setAutoBackupFrequency(BackupFrequency.OFF, contentResolver)
+        mockStatic(com.yonte.core.backup.AutoBackupScheduler::class.java).use {
+            viewModel.setAutoBackupFrequency(BackupFrequency.OFF, contentResolver)
 
-        verify(mockLocalKeyManager).clearAutoBackupKey()
-        assertEquals(BackupFrequency.OFF, viewModel.uiState.value.frequency)
+            verify(mockLocalKeyManager).clearAutoBackupKey()
+            assertEquals(BackupFrequency.OFF, viewModel.uiState.value.frequency)
+        }
     }
 
     @Test
@@ -75,10 +76,12 @@ class SettingsViewModelTest {
         val viewModel = createViewModel()
         val contentResolver = mock(ContentResolver::class.java)
 
-        viewModel.setAutoBackupFrequency(BackupFrequency.MONTHLY, contentResolver)
+        mockStatic(com.yonte.core.backup.AutoBackupScheduler::class.java).use {
+            viewModel.setAutoBackupFrequency(BackupFrequency.MONTHLY, contentResolver)
 
-        verify(mockLocalKeyManager, org.mockito.Mockito.never()).clearAutoBackupKey()
-        assertEquals(BackupFrequency.MONTHLY, viewModel.uiState.value.frequency)
+            verify(mockLocalKeyManager, org.mockito.Mockito.never()).clearAutoBackupKey()
+            assertEquals(BackupFrequency.MONTHLY, viewModel.uiState.value.frequency)
+        }
     }
 
     private fun createViewModel(): SettingsViewModel {
