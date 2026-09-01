@@ -383,8 +383,6 @@ class MainActivity : FragmentActivity() {
                 currentVersionCode = BuildConfig.VERSION_CODE,
                 onClose = { showSettings = false },
                 localKeyManager = localKeyManager,
-                sessionKey = localKeyManager.cachedSessionKey(),
-                localSalt = localKeyManager.currentSalt(),
             )
         } else {
             NotesRoute(
