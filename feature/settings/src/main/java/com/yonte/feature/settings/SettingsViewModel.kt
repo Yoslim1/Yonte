@@ -28,7 +28,7 @@ internal class SettingsViewModel(
     private val updateGateway: UpdateGateway,
     private val localKeyManager: LocalKeyManager,
     private val currentVersionCode: Int,
-    appContext: Context,
+    private val appContext: Context,
 ) : ViewModel() {
     private val prefs = appContext.getSharedPreferences(ScheduledBackupWorker.PREFS_NAME, Context.MODE_PRIVATE)
 
@@ -141,16 +141,16 @@ internal class SettingsViewModel(
         _uiState.value = _uiState.value.copy(destinationUri = uri.toString())
         val freq = _uiState.value.frequency
         if (freq != BackupFrequency.OFF) {
-            AutoBackupScheduler.schedule(contentResolver.context, freq)
+            AutoBackupScheduler.schedule(appContext, freq)
         }
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(backupSizeBytes = calculateBackupSize(contentResolver.context, uri))
+            _uiState.value = _uiState.value.copy(backupSizeBytes = calculateBackupSize(appContext, uri))
         }
     }
 
     fun setAutoBackupFrequency(frequency: BackupFrequency, contentResolver: ContentResolver) {
         prefs.edit().putString(KEY_FREQUENCY, frequency.name).apply()
-        AutoBackupScheduler.schedule(contentResolver.context, frequency)
+        AutoBackupScheduler.schedule(appContext, frequency)
         _uiState.value = _uiState.value.copy(frequency = frequency)
         if (frequency == BackupFrequency.OFF) {
             localKeyManager.clearAutoBackupKey()
@@ -159,7 +159,7 @@ internal class SettingsViewModel(
             if (destUri != null) {
                 viewModelScope.launch {
                     _uiState.value = _uiState.value.copy(
-                        backupSizeBytes = calculateBackupSize(contentResolver.context, Uri.parse(destUri)),
+                        backupSizeBytes = calculateBackupSize(appContext, Uri.parse(destUri)),
                     )
                 }
             }
