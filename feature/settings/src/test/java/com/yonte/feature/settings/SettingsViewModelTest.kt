@@ -13,7 +13,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
 import org.mockito.Mockito.mock
-import org.mockito.Mockito.mockStatic
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 
@@ -26,6 +25,7 @@ class SettingsViewModelTest {
     private lateinit var mockBackupGateway: BackupGateway
     private lateinit var mockUpdateGateway: UpdateGateway
     private lateinit var mockLocalKeyManager: LocalKeyManager
+    private val scheduledFrequencies = mutableListOf<BackupFrequency>()
 
     @Before
     fun setUp() {
@@ -36,6 +36,7 @@ class SettingsViewModelTest {
         mockBackupGateway = mock(BackupGateway::class.java)
         mockUpdateGateway = mock(UpdateGateway::class.java)
         mockLocalKeyManager = mock(LocalKeyManager::class.java)
+        scheduledFrequencies.clear()
 
         `when`(mockContext.getSharedPreferences(ScheduledBackupWorker.PREFS_NAME, Context.MODE_PRIVATE)).thenReturn(mockPrefs)
         `when`(mockPrefs.edit()).thenReturn(mockEditor)
@@ -48,14 +49,12 @@ class SettingsViewModelTest {
         val viewModel = createViewModel()
         val contentResolver = mock(ContentResolver::class.java)
 
-        mockStatic(com.yonte.core.backup.AutoBackupScheduler::class.java).use { mockedScheduler ->
-            viewModel.setAutoBackupFrequency(BackupFrequency.WEEKLY, contentResolver)
+        viewModel.setAutoBackupFrequency(BackupFrequency.WEEKLY, contentResolver)
 
-            verify(mockEditor).putString("auto_backup_frequency", BackupFrequency.WEEKLY.name)
-            verify(mockEditor).apply()
-            assertEquals(BackupFrequency.WEEKLY, viewModel.uiState.value.frequency)
-            mockedScheduler.verify { com.yonte.core.backup.AutoBackupScheduler.schedule(mockContext, BackupFrequency.WEEKLY) }
-        }
+        verify(mockEditor).putString("auto_backup_frequency", BackupFrequency.WEEKLY.name)
+        verify(mockEditor).apply()
+        assertEquals(BackupFrequency.WEEKLY, viewModel.uiState.value.frequency)
+        assertEquals(listOf(BackupFrequency.WEEKLY), scheduledFrequencies)
     }
 
     @Test
@@ -63,12 +62,12 @@ class SettingsViewModelTest {
         val viewModel = createViewModel()
         val contentResolver = mock(ContentResolver::class.java)
 
-        mockStatic(com.yonte.core.backup.AutoBackupScheduler::class.java).use {
-            viewModel.setAutoBackupFrequency(BackupFrequency.OFF, contentResolver)
+        viewModel.setAutoBackupFrequency(BackupFrequency.OFF, contentResolver)
 
-            verify(mockLocalKeyManager).clearAutoBackupKey()
-            assertEquals(BackupFrequency.OFF, viewModel.uiState.value.frequency)
-        }
+        verify(mockLocalKeyManager).clearAutoBackupKey()
+        assertEquals(BackupFrequency.OFF, viewModel.uiState.value.frequency)
+        assertEquals(listOf(BackupFrequency.OFF), scheduledFrequencies)
+
     }
 
     @Test
@@ -76,12 +75,12 @@ class SettingsViewModelTest {
         val viewModel = createViewModel()
         val contentResolver = mock(ContentResolver::class.java)
 
-        mockStatic(com.yonte.core.backup.AutoBackupScheduler::class.java).use {
-            viewModel.setAutoBackupFrequency(BackupFrequency.MONTHLY, contentResolver)
+        viewModel.setAutoBackupFrequency(BackupFrequency.MONTHLY, contentResolver)
 
-            verify(mockLocalKeyManager, org.mockito.Mockito.never()).clearAutoBackupKey()
-            assertEquals(BackupFrequency.MONTHLY, viewModel.uiState.value.frequency)
-        }
+        verify(mockLocalKeyManager, org.mockito.Mockito.never()).clearAutoBackupKey()
+        assertEquals(BackupFrequency.MONTHLY, viewModel.uiState.value.frequency)
+        assertEquals(listOf(BackupFrequency.MONTHLY), scheduledFrequencies)
+
     }
 
     private fun createViewModel(): SettingsViewModel {
@@ -92,6 +91,7 @@ class SettingsViewModelTest {
             localKeyManager = mockLocalKeyManager,
             currentVersionCode = 1,
             appContext = mockContext,
+            scheduleAutoBackup = { _, frequency -> scheduledFrequencies.add(frequency) },
         )
     }
 }

@@ -29,6 +29,9 @@ internal class SettingsViewModel(
     private val localKeyManager: LocalKeyManager,
     private val currentVersionCode: Int,
     private val appContext: Context,
+    private val scheduleAutoBackup: (Context, BackupFrequency) -> Unit = { context, frequency ->
+        AutoBackupScheduler.schedule(context, frequency)
+    },
 ) : ViewModel() {
     private val prefs = appContext.getSharedPreferences(ScheduledBackupWorker.PREFS_NAME, Context.MODE_PRIVATE)
 
@@ -141,7 +144,7 @@ internal class SettingsViewModel(
         _uiState.value = _uiState.value.copy(destinationUri = uri.toString())
         val freq = _uiState.value.frequency
         if (freq != BackupFrequency.OFF) {
-            AutoBackupScheduler.schedule(appContext, freq)
+            scheduleAutoBackup(appContext, freq)
         }
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(backupSizeBytes = calculateBackupSize(appContext, uri))
@@ -150,7 +153,7 @@ internal class SettingsViewModel(
 
     fun setAutoBackupFrequency(frequency: BackupFrequency, contentResolver: ContentResolver) {
         prefs.edit().putString(KEY_FREQUENCY, frequency.name).apply()
-        AutoBackupScheduler.schedule(appContext, frequency)
+        scheduleAutoBackup(appContext, frequency)
         _uiState.value = _uiState.value.copy(frequency = frequency)
         if (frequency == BackupFrequency.OFF) {
             localKeyManager.clearAutoBackupKey()
