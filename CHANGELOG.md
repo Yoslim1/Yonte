@@ -1,5 +1,34 @@
 # Changelog
 
+## Unreleased — CI and agent-environment fixes (2026-09-02)
+
+- Fixed `.opencode/agents/{implementer,reviewer,tester}.md`: YAML front matter was
+  missing its closing delimiter and, in a later manual edit, its opening delimiter;
+  the `bash` permission catch-all used `""` instead of the documented `"*"` wildcard,
+  which meant unmatched bash commands fell through to the default-allow behavior
+  instead of being denied. All three files are now valid YAML with `mode: subagent`
+  and `permission.bash["*"] = deny` confirmed via independent re-clone and
+  `yaml.safe_load()`. (commit `38f1f5f`)
+- Fixed CI: `Instrumented database security tests` failed on every run because the
+  `ubuntu-latest` GitHub-hosted runner does not grant `/dev/kvm` access by default,
+  forcing the Android emulator into slow software emulation that never finished
+  booting (`ProbeKVM: user has no KVM permissions`, run `33604781380`). Added a step
+  to enable the KVM udev rule before the emulator step. (commit `d36a1bb`)
+- Added `Upload instrumented test report` (`if: always()`) so instrumented test
+  failures are diagnosable from the actual JUnit report instead of the truncated
+  Gradle console log. (commit `2bb010a`)
+- Fixed `YonteDatabaseEncryptionTest.singletonCanBeClosedAndReopenedWithTheSameKey()`:
+  its `runBlocking { ... }` expression body's last statement was
+  `context.deleteDatabase(...)`, which returns `Boolean`, making the compiled method
+  non-void. JUnit4 rejected the whole test class (`InvalidTestClassError: ... should
+  be void`) before any test could run. Added an explicit trailing `Unit`.
+  (commit `7260919`)
+- **Result:** `Instrumented database security tests` passed for the first time with
+  real emulator execution, confirmed independently via
+  `gh run view 33678173736 --json jobs`, run `33678173736`, all 16 steps `success`.
+  This closes the two open items from `HARDENING_AUDIT_REPORT.md` (now marked
+  HISTORICAL).
+
 ## 1.6.0 — Yonte notes and tasks interaction
 
 - Added a Yonte-native Quick Add bottom sheet with separate Note and Task entry paths.

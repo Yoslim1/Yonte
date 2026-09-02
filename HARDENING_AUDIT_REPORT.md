@@ -1,5 +1,10 @@
 # Repository Hardening Audit Report
 
+**Status:** HISTORICAL — describes a working-tree snapshot from 2026-09-02 that predates
+commits `693fd94`..`7260919`. The two open BLOCKER/HIGH items recorded below
+(`SettingsViewModelTest` mockStatic failure, unverified instrumented database test) were
+closed and CI-verified afterward. See `CHANGELOG.md` for the current, evidence-based record.
+
 **Repository:** `Yoslim1/Yonte`  
 **Branch:** `main`  
 **Working tree:** modified, no commit/push/merge performed  
