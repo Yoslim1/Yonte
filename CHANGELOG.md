@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — TASK 14 follow-up fixes (2026-09-02)
+
+- Fixed `YonteDatabase.kt`: removed a leftover `// changelog-gate-test` debug comment
+  left behind by an incomplete revert, and restored
+  `.fallbackToDestructiveMigrationOnDowngrade()`, which had been silently dropped in
+  the same round of changes with no stated reason. (commit `6bd8a19`)
+
 ## Unreleased — CI changelog-gate verification
 
 - Verified the new changelog-enforcement gate (`tools/check_changelog.py`) correctly fails a push that touches `core/` without a CHANGELOG.md entry (run `33683980747`), then correctly requires one for the revert itself (run `33684758101`). Test change fully reverted; no product behavior changed.
