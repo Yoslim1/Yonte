@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased — CI changelog-gate verification
+
+- Verified the new changelog-enforcement gate (`tools/check_changelog.py`) correctly fails a push that touches `core/` without a CHANGELOG.md entry (run `33683980747`), then correctly requires one for the revert itself (run `33684758101`). Test change fully reverted; no product behavior changed.
+
 ## Unreleased — CI and agent-environment fixes (2026-09-02)
 
 - Fixed `.opencode/agents/{implementer,reviewer,tester}.md`: YAML front matter was
