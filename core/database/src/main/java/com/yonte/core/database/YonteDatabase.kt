@@ -67,8 +67,8 @@ abstract class YonteDatabase : RoomDatabase() {
                         }
                     }
                 })
+                .fallbackToDestructiveMigrationOnDowngrade()
                 .build()
         }
     }
 }
-// changelog-gate-test
