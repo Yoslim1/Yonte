@@ -53,6 +53,14 @@ jobs:
           profile: pixel_2
           script: ./gradlew :core:database:connectedDebugAndroidTest --stacktrace
 
+      - name: Upload instrumented test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: database-connected-test-report
+          path: core/database/build/reports/androidTests/connected/**
+          if-no-files-found: warn
+
       - name: Lint
         run: ./gradlew :app:lintDebug --stacktrace
 
