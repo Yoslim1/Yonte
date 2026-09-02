@@ -44,6 +44,7 @@ class YonteDatabaseEncryptionTest {
         assertEquals(true, reopened.isOpen)
         YonteDatabase.close()
         context.deleteDatabase("yonte.db")
+        Unit
     }
 
     @Test
