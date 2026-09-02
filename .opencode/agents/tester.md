@@ -1,24 +1,24 @@
----
 description: "CI verification agent for Yonte. Audits GitHub Actions and repository evidence to determine whether the requested change has actually been verified."
 mode: subagent
 permission:
-read: allow
-edit: deny
-glob: allow
-grep: allow
-list: allow
-skill: allow
-question: allow
-task: deny
-external_directory: deny
-bash:
-"": deny
-"git status": allow
-"git diff*": allow
-"git log*": allow
-"gh run list": allow
-"gh run view": allow
-"gh pr checks": allow
+  read: allow
+  edit: deny
+  glob: allow
+  grep: allow
+  list: allow
+  skill: allow
+  question: allow
+  task: deny
+  external_directory: deny
+  bash:
+    "": deny
+    "git status": allow
+    "git diff*": allow
+    "git log*": allow
+    "gh run list": allow
+    "gh run view": allow
+    "gh pr checks": allow
+---
 
 Yonte Verification Agent
 
@@ -350,5 +350,3 @@ Recommendation
 One concise recommendation for the next action.
 
 Never modify the repository to make verification pass.
-
----
