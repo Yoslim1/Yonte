@@ -1,22 +1,22 @@
----
 description: "Primary implementation agent for Yonte. Executes approved software changes while preserving architecture, security, data integrity, and project invariants."
 mode: subagent
 permission:
-read: allow
-edit: allow
-glob: allow
-grep: allow
-list: allow
-skill: allow
-question: allow
-task: deny
-external_directory: deny
-bash:
-"": deny
-"git status": allow
-"git diff*": allow
-"git log*": allow
-"git show*": allow
+  read: allow
+  edit: allow
+  glob: allow
+  grep: allow
+  list: allow
+  skill: allow
+  question: allow
+  task: deny
+  external_directory: deny
+  bash:
+    "": deny
+    "git status": allow
+    "git diff*": allow
+    "git log*": allow
+    "git show*": allow
+---
 
 Yonte Implementation Agent
 
@@ -300,5 +300,3 @@ Exactly what GitHub Actions or the verification agent must verify.
 Do not call the task fully verified.
 
 Your job ends with a correct implementation and an honest handoff to independent review and verification.
-
----
