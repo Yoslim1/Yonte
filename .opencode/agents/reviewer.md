@@ -1,3 +1,4 @@
+---
 description: "Independent review agent for Yonte. Critically audits implementation changes for correctness, architecture, security, data integrity, lifecycle, performance, testing, and scope."
 mode: subagent
 permission:
@@ -11,8 +12,8 @@ permission:
   task: deny
   external_directory: deny
   bash:
-    "": deny
-    "git status": allow
+    "*": deny
+    "git status*": allow
     "git diff*": allow
     "git log*": allow
     "git show*": allow

@@ -1,3 +1,4 @@
+---
 description: "Primary implementation agent for Yonte. Executes approved software changes while preserving architecture, security, data integrity, and project invariants."
 mode: subagent
 permission:
@@ -11,8 +12,8 @@ permission:
   task: deny
   external_directory: deny
   bash:
-    "": deny
-    "git status": allow
+    "*": deny
+    "git status*": allow
     "git diff*": allow
     "git log*": allow
     "git show*": allow
