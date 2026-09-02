@@ -5,7 +5,15 @@ Fails CI if impactful source paths changed without a CHANGELOG.md entry
 in the same diff range. Uses an allow-list (fail-closed): only paths
 listed in IMPACTFUL_PREFIXES require a changelog entry. Anything not
 listed (docs/, README.md, .gitignore, etc.) is exempt by default.
+
+Base commit resolution order:
+1. $CHANGELOG_GATE_BASE_SHA (set by the workflow from github.event.before)
+   -- correct for "push" events, since origin/main already equals HEAD
+   by the time this job runs.
+2. merge-base with origin/main -- fallback for manual/local runs.
+3. HEAD~1 -- last-resort fallback.
 """
+import os
 import subprocess
 import sys
 
@@ -17,6 +25,8 @@ IMPACTFUL_PREFIXES = (
     ".github/workflows/",
 )
 
+ZERO_SHA = "0000000000000000000000000000000000000000"
+
 
 def run(cmd):
     try:
@@ -25,15 +35,29 @@ def run(cmd):
         return ""
 
 
-def main():
-    run(["git", "fetch", "origin", "main", "--depth=50"])
-    base = run(["git", "merge-base", "origin/main", "HEAD"]) or "HEAD~1"
+def resolve_base():
+    env_base = os.environ.get("CHANGELOG_GATE_BASE_SHA", "").strip()
+    if env_base and env_base != ZERO_SHA:
+        if run(["git", "cat-file", "-e", env_base]):
+            return env_base
+        print(f"WARNING: base SHA {env_base} not present locally "
+              f"(shallow clone?); falling back.")
 
-    changed = run(["git", "diff", "--name-only", base, "HEAD"]).splitlines()
-    changed = [f for f in changed if f]
+    run(["git", "fetch", "origin", "main", "--depth=50"])
+    merge_base = run(["git", "merge-base", "origin/main", "HEAD"])
+    head = run(["git", "rev-parse", "HEAD"])
+    if merge_base and merge_base != head:
+        return merge_base
+
+    return "HEAD~1"
+
+
+def main():
+    base = resolve_base()
+    changed = [f for f in run(["git", "diff", "--name-only", base, "HEAD"]).splitlines() if f]
 
     if not changed:
-        print("PASS: no changes in diff range.")
+        print(f"PASS: no changes between {base} and HEAD.")
         return 0
 
     impactful = [f for f in changed if f.startswith(IMPACTFUL_PREFIXES)]
