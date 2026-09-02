@@ -336,6 +336,15 @@ Before declaring completion:
 - Confirm tests/verification evidence.
 - Confirm no secrets or sensitive data were introduced.
 - Confirm the requested behavior is actually implemented.
+- If the change touches any path under `core/`, `feature/`, `app/`, `.opencode/`, or
+  `.github/workflows/`, confirm a `CHANGELOG.md` entry describing the change was added
+  in the same commit — `tools/check_changelog.py` enforces this in CI and will fail the
+  build otherwise. Add the entry yourself as part of normal task completion; do not
+  wait to be asked, and do not treat a changelog-gate failure as a surprise to escalate
+  back to the user — it is a routine, expected part of finishing any task in scope.
+  Follow the existing format in `CHANGELOG.md` (a dated `## Unreleased — <short
+  summary> (YYYY-MM-DD)` section with one or more bullet points, each naming the
+  specific file(s)/behavior changed and the relevant commit hash once known).
 
 ---
 
