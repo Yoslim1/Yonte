@@ -1,5 +1,4 @@
 ---
-
 description: "CI verification agent for Yonte. Audits GitHub Actions and repository evidence to determine whether the requested change has actually been verified."
 mode: subagent
 permission:
@@ -351,3 +350,5 @@ Recommendation
 One concise recommendation for the next action.
 
 Never modify the repository to make verification pass.
+
+---

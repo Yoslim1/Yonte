@@ -21,8 +21,8 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.documentfile)
-    testImplementation("junit:junit:4.13.2")
+    testImplementation(libs.junit)
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core)
-    testImplementation("androidx.work:work-testing:2.10.0")
+    testImplementation(libs.androidx.work.testing)
 }

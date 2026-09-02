@@ -1,5 +1,8 @@
 # Yonte V2 Roadmap
 
+Status: ACTIVE
+Last reviewed: 2026-09-02
+
 ## Product goal
 
 Yonte V2 is not a feature-count exercise. Its goal is to make the notes experience feel continuous, calm, and predictable: capture should be immediate, search should be visible, organization should be lightweight, and every action should have clear feedback and a safe recovery path.

@@ -12,4 +12,9 @@ core/*/build/
 feature/*/build/
 *.keystore
 *.jks
+*.p12
+*.pfx
+*.pkcs12
+.env
+.env.*
 yonte-release.properties

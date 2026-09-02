@@ -1,47 +1,52 @@
 # Yonte
 
-Yonte is an Android-only personal workspace that starts with fast, private notes and is designed to grow into habits, projects, finance, and intelligent assistance.
+Yonte is an Android-only personal workspace for private, local-first notes. The repository currently implements encrypted local notes, organization, search, backup support, and an update-checking flow without an account or required server.
 
 ## Current scope
 
-Yonte V2 focuses on a smooth local notes workspace: title and body editing, Arabic/English-ready UI, RTL, pinning, archiving, trash, visible search, tag filtering, pinned/recent grouping, list/grid presentation, Android share-to-note intents, encrypted backup actions, and a manual update center that verifies APK SHA-256 before installation.
+The implemented notes workspace supports title and body editing, Arabic/English-ready UI, RTL-aware layouts, pinning, archiving, trash, search, tag filtering, pinned/recent grouping, list/grid presentation, Android share-to-note intents, encrypted backup actions, and a manual update center that verifies APK SHA-256 before installation. These capabilities are local application behavior; future roadmap items are not treated as current features.
 
 Yonte targets **Android API 26 and above**. There is no iOS or web product target in this repository.
 
-## Technology
+## Technology and security model
 
-- Kotlin and Jetpack Compose
-- Material 3 with dynamic colors on supported Android versions
-- Room over SQLite
-- FTS5 capability detection with normalized-text fallback
-- Feature-driven, multi-module Gradle structure
-- Android Keystore foundation for AES-GCM encryption
-- Storage Access Framework adapter for future backup/restore flows
+The application uses Kotlin, Jetpack Compose, Material 3, Hilt, Room, SQLCipher, Android Keystore-backed key wrapping, Argon2-based passphrase derivation, and Kotlin coroutines. Room persists notes through SQLCipher's encrypted SQLite driver; there is no plaintext database fallback. The passphrase-derived session key is available only after onboarding or unlock and is never persisted as plaintext. The process-local database singleton is bound to an in-memory SHA-256 digest of the active session key, so it is not reused for a different key, and it can be explicitly closed before a new session is opened.
+
+The security model also includes PIN and biometric unlock paths backed by the existing local key-management components. Backup and restore use a separate encrypted envelope and are not a substitute for the database encryption boundary.
 
 ## Modules
 
-- `:app` — Android entry point and platform intents.
-- `:core:database` — Room entities, migrations, Arabic normalization, search repository.
-- `:core:security` — Keystore-backed encryption foundation and biometric dependency.
-- `:core:backup` — Versioned encrypted backup envelope.
-- `:core:navigation` — Feature navigation contracts.
-- `:core:designsystem` — Shared Compose theme.
-- `:feature:notes` — Notes UI and presentation logic.
+| Module | Responsibility |
+|---|---|
+| `:app` | Android entry point, Hilt wiring, lifecycle, platform intents, and navigation host. |
+| `:core:database` | SQLCipher-backed Room database, entities, DAOs, repositories, migrations/schema configuration, and Arabic normalization/search. |
+| `:core:security` | Argon2 key derivation, Android Keystore-backed wrapping, PIN state, and biometric support. |
+| `:core:backup` | Versioned encrypted backup envelope and scheduled backup integration. |
+| `:core:navigation` | Shared feature navigation contracts. |
+| `:core:designsystem` | Shared Compose theme and design tokens. |
+| `:core:update` | Update checking, download, SHA-256 verification, and installation handoff. |
+| `:feature:notes` | Notes UI, editor, search, and presentation logic. |
+| `:feature:settings` | Settings UI and backup/update configuration behavior. |
+| `:feature:onboarding` | First-run onboarding and unlock-flow UI. |
 
-## Build
+Feature modules do not depend on other feature modules, and core modules do not depend on the application or feature modules. The executable architecture guard is `python3 tools/check_architecture.py`.
 
-Open the repository in Android Studio with JDK 17, or run:
+## Build and CI
+
+Open the repository in Android Studio with JDK 17. The repository's version catalog at [`gradle/libs.versions.toml`](gradle/libs.versions.toml) is the source of truth for dependency and plugin versions. The local command for a developer build is:
 
 ```bash
 ./gradlew :app:assembleDebug
 ```
 
-The GitHub Actions workflow enforces feature isolation, then builds the debug APK on every push to `main` and every pull request. Hilt owns application composition, while features consume Core interfaces rather than concrete service implementations. Release metadata is published separately in the public `Yoslim1/Yonte-updates` repository because the source repository is private; the app checks that feed only when the user requests an update check.
+GitHub Actions is the authoritative verification environment for repository changes. The workflow runs the architecture guard, JVM tests for the configured modules, a debug APK compilation, and app lint, then uploads the debug APK as an artifact. Instrumented database tests require an Android device/emulator and are not represented as passing merely because JVM CI is green.
 
-## Architecture
+The signed-release job is conditional on a version tag, the `YONTE_SIGNED_RELEASE_ENABLED` repository variable, and the configured signing secrets. It restores signing material only in the CI workspace, verifies the APK signature with `apksigner`, and uploads the resulting release artifact. No signing material belongs in the repository.
 
-The mandatory modularization rules are documented in [`docs/FEATURE_ISOLATION_BLUEPRINT.md`](docs/FEATURE_ISOLATION_BLUEPRINT.md). The architecture guard is executable as `python3 tools/check_architecture.py` and must pass before a build is accepted.
+## Documentation
+
+The modularization rules are documented in [`docs/FEATURE_ISOLATION_BLUEPRINT.md`](docs/FEATURE_ISOLATION_BLUEPRINT.md). Roadmaps and design/reference notes are planning or historical material and must not override the current source code or Gradle configuration.
 
 ## Data safety
 
-The application is local-first and does not require an account or a server. Plain SQLite is not represented as full-database encryption. The security and backup modules are deliberately separated so that SQLCipher or field-level encryption can be introduced only after a tested proof of concept.
+Yonte is local-first and does not require an account or a server. Protected application data is stored in an encrypted SQLCipher database. Schema downgrades do not use destructive migration fallback; if a downgrade cannot be migrated safely, it must fail visibly rather than silently discard user data. Backup data is separately encrypted and is handled through the backup module.

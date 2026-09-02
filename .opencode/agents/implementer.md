@@ -1,5 +1,4 @@
 ---
-
 description: "Primary implementation agent for Yonte. Executes approved software changes while preserving architecture, security, data integrity, and project invariants."
 mode: subagent
 permission:
@@ -301,3 +300,5 @@ Exactly what GitHub Actions or the verification agent must verify.
 Do not call the task fully verified.
 
 Your job ends with a correct implementation and an honest handoff to independent review and verification.
+
+---

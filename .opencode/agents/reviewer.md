@@ -1,5 +1,4 @@
 ---
-
 description: "Independent review agent for Yonte. Critically audits implementation changes for correctness, architecture, security, data integrity, lifecycle, performance, testing, and scope."
 mode: subagent
 permission:
@@ -312,3 +311,5 @@ Clearly state what was and was not verified.
 Never claim CI/build/test success without authoritative evidence.
 
 An independent review is complete only when the implementation has been challenged from multiple failure perspectives rather than merely inspected for style.
+
+---

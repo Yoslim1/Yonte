@@ -1,5 +1,8 @@
 # Yonte UX adaptation note
 
+Status: REFERENCE
+Last reviewed: 2026-09-02
+
 ## Purpose
 
 This document records how Yonte uses Knote as a behavioral and quality reference without cloning its implementation. Yonte remains a local-only Arabic/English Android notes product with its own visual language, copy, architecture, and data contracts.

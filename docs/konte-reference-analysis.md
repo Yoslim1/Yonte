@@ -1,5 +1,8 @@
 # Reference analysis: knote
 
+Status: REFERENCE
+Last reviewed: 2026-09-02
+
 The available repository was `Yoslim1/knote`, not a repository named `Konte`. It was inspected as a reference only. No source code, assets, or branding are copied into Yonte.
 
 ## Useful product ideas to reinterpret

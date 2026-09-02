@@ -1,5 +1,8 @@
 # Yonte Update System — Stress Test Report
 
+Status: REFERENCE
+Last reviewed: 2026-09-02
+
 ## Scope
 
 This test covers the public update manifest, version comparison, trusted URL validation, HTTPS transport, APK download, SHA-256 verification, signing certificate pinning, malformed input handling, bounded timeouts, and release build integrity.

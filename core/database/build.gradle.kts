@@ -7,7 +7,10 @@ plugins {
 android {
     namespace = "com.yonte.core.database"
     compileSdk = 35
-    defaultConfig { minSdk = 26 }
+    defaultConfig {
+        minSdk = 26
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -23,7 +26,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.sqlcipher.android)
     implementation(libs.androidx.sqlite)
-    testImplementation("junit:junit:4.13.2")
-    androidTestImplementation("androidx.test.ext:junit:1.2.1")
-    androidTestImplementation("androidx.test:core:1.6.1")
+    testImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.core)
 }

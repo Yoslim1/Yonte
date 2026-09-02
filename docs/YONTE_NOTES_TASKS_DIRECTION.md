@@ -1,5 +1,8 @@
 # Yonte notes and tasks direction
 
+Status: REFERENCE
+Last reviewed: 2026-09-02
+
 ## Product identity
 
 Yonte remains the product name, Android package, repository, and local-first application. The attached Knote documents are reference material only. Yonte will not copy Knote's name, palette, illustrations, wording, navigation labels, or implementation. The target is a **private personal workspace** where long-form notes and actionable tasks can coexist without making the home screen feel like a dashboard.

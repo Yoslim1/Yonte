@@ -1,5 +1,8 @@
 # Yonte Feature Isolation Blueprint
 
+Status: ACTIVE
+Last reviewed: 2026-09-02
+
 ## Status
 
 This document is a mandatory engineering rule for Yonte V2 and all later releases. It applies to production code, tests, Gradle dependencies, navigation, state ownership, and shared UI decisions.

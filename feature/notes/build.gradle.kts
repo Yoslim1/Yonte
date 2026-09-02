@@ -35,5 +35,5 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.bundles.compose)
-    testImplementation("junit:junit:4.13.2")
+    testImplementation(libs.junit)
 }

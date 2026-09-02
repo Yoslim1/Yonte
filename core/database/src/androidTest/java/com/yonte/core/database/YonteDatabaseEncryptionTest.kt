@@ -28,6 +28,25 @@ class YonteDatabaseEncryptionTest {
             .build()
 
     @Test
+    fun singletonCanBeClosedAndReopenedWithTheSameKey() = runBlocking {
+        System.loadLibrary("sqlcipher")
+        context.deleteDatabase("yonte.db")
+        YonteDatabase.close()
+        val key = ByteArray(32).also { SecureRandom().nextBytes(it) }
+
+        val first = YonteDatabase.get(context, key)
+        first.noteDao().getAll()
+        YonteDatabase.close()
+        val reopened = YonteDatabase.get(context, key)
+        reopened.noteDao().getAll()
+
+        assertEquals(false, first.isOpen)
+        assertEquals(true, reopened.isOpen)
+        YonteDatabase.close()
+        context.deleteDatabase("yonte.db")
+    }
+
+    @Test
     fun encryptedDatabaseOpensWithCorrectKeyAndRejectsWrongKey() = runBlocking {
         System.loadLibrary("sqlcipher")
         context.deleteDatabase(dbName)

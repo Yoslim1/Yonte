@@ -18,6 +18,12 @@ argon2kt = "1.5.0"
 workManager = "2.10.0"
 robolectric = "4.14.1"
 androidxTestCore = "1.6.1"
+androidxTestExtJunit = "1.2.1"
+junit = "4.13.2"
+sqlite = "2.4.0"
+documentfile = "1.0.1"
+workTesting = "2.10.0"
+mockito = "5.14.2"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
@@ -42,12 +48,16 @@ androidx-hilt-navigation-compose = { module = "androidx.hilt:hilt-navigation-com
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
 sqlcipher-android = { module = "net.zetetic:sqlcipher-android", version.ref = "sqlcipher" }
-androidx-sqlite = { module = "androidx.sqlite:sqlite", version = "2.4.0" }
+androidx-sqlite = { module = "androidx.sqlite:sqlite", version.ref = "sqlite" }
 argon2kt = { module = "com.lambdapioneer.argon2kt:argon2kt", version.ref = "argon2kt" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "workManager" }
-androidx-documentfile = { module = "androidx.documentfile:documentfile", version = "1.0.1" }
+androidx-documentfile = { module = "androidx.documentfile:documentfile", version.ref = "documentfile" }
 androidx-test-core = { module = "androidx.test:core", version.ref = "androidxTestCore" }
+androidx-test-ext-junit = { module = "androidx.test.ext:junit", version.ref = "androidxTestExtJunit" }
+junit = { module = "junit:junit", version.ref = "junit" }
+androidx-work-testing = { module = "androidx.work:work-testing", version.ref = "workTesting" }
+mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }
 
 [bundles]
 compose = ["androidx-compose-ui", "androidx-compose-ui-tooling-preview", "androidx-compose-material3", "androidx-compose-icons-extended"]

@@ -18,7 +18,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.biometric)
     implementation(libs.argon2kt)
-    testImplementation("junit:junit:4.13.2")
+    testImplementation(libs.junit)
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core)
 }
