@@ -35,6 +35,9 @@ jobs:
       - name: Enforce feature isolation
         run: python3 tools/check_architecture.py
 
+      - name: Enforce changelog updates
+        run: python3 tools/check_changelog.py
+
       - name: Check Kotlin and compile debug APK
         run: ./gradlew :core:update:test :core:database:test :core:security:test :core:backup:test :feature:notes:test :feature:onboarding:test :feature:settings:test :app:assembleDebug --stacktrace
 
@@ -58,7 +61,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: database-connected-test-report
-          path: core/database/build/reports/androidTests/connected/**
+          path: |
+            core/database/build/reports/androidTests/
+            core/database/build/test-results/
           if-no-files-found: warn
 
       - name: Lint

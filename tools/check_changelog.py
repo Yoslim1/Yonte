@@ -1,0 +1,61 @@
+#!/usr/bin/env python3
+"""
+tools/check_changelog.py
+Fails CI if impactful source paths changed without a CHANGELOG.md entry
+in the same diff range. Uses an allow-list (fail-closed): only paths
+listed in IMPACTFUL_PREFIXES require a changelog entry. Anything not
+listed (docs/, README.md, .gitignore, etc.) is exempt by default.
+"""
+import subprocess
+import sys
+
+IMPACTFUL_PREFIXES = (
+    "core/",
+    "feature/",
+    "app/",
+    ".opencode/",
+    ".github/workflows/",
+)
+
+
+def run(cmd):
+    try:
+        return subprocess.check_output(cmd, text=True).strip()
+    except subprocess.CalledProcessError:
+        return ""
+
+
+def main():
+    run(["git", "fetch", "origin", "main", "--depth=50"])
+    base = run(["git", "merge-base", "origin/main", "HEAD"]) or "HEAD~1"
+
+    changed = run(["git", "diff", "--name-only", base, "HEAD"]).splitlines()
+    changed = [f for f in changed if f]
+
+    if not changed:
+        print("PASS: no changes in diff range.")
+        return 0
+
+    impactful = [f for f in changed if f.startswith(IMPACTFUL_PREFIXES)]
+
+    if not impactful:
+        print("PASS: no impactful paths changed; changelog entry not required.")
+        print(f"  changed: {changed}")
+        return 0
+
+    if "CHANGELOG.md" not in changed:
+        print("FAIL: impactful paths changed without a CHANGELOG.md entry:")
+        for f in impactful:
+            print(f"  - {f}")
+        print()
+        print("Add a dated entry under CHANGELOG.md, citing the commit hash")
+        print("and, if the change closes a CI/test finding, the run ID that")
+        print("proves it, then include CHANGELOG.md in this same commit.")
+        return 1
+
+    print("PASS: CHANGELOG.md updated alongside impactful changes.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
