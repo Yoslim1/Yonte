@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — fix missing Composable import after TASK 15 split (2026-09-03)
+
+- `BiometricUnlockRoute.kt` and `QuickUnlockSetupRoute.kt` were missing
+  `import androidx.compose.runtime.Composable` after the TASK 15 file split,
+  causing `Unresolved reference 'Composable'` and a compile failure (CI run
+  `33716738111`). Added the import to both files; `PinRoute.kt` and
+  `PassphraseUnlockRoute.kt` already had it correctly.
+
 ## Unreleased — TASK 15: split AppLockGate.kt (2026-09-02)
 
 - Split `feature/onboarding/.../AppLockGate.kt` (248 lines) into one file per screen:
