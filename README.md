@@ -39,7 +39,7 @@ Open the repository in Android Studio with JDK 17. The repository's version cata
 ./gradlew :app:assembleDebug
 ```
 
-GitHub Actions is the authoritative verification environment for repository changes. The workflow runs the architecture guard, JVM tests for the configured modules, a debug APK compilation, and app lint, then uploads the debug APK as an artifact. Instrumented database tests require an Android device/emulator and are not represented as passing merely because JVM CI is green.
+GitHub Actions is the authoritative verification environment for repository changes. The workflow runs the architecture guard, a changelog-entry check for impactful paths, JVM tests for the configured modules, a debug APK compilation, instrumented database encryption tests on a GitHub-hosted emulator (`core/database`), and app lint, then uploads the debug APK and the instrumented test report as artifacts. Instrumented test results are not represented as passing merely because the JVM-only steps are green; see the `Instrumented database security tests` job step for that evidence specifically.
 
 The signed-release job is conditional on a version tag, the `YONTE_SIGNED_RELEASE_ENABLED` repository variable, and the configured signing secrets. It restores signing material only in the CI workspace, verifies the APK signature with `apksigner`, and uploads the resulting release artifact. No signing material belongs in the repository.
 

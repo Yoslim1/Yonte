@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — README accuracy update (2026-09-03)
+
+- Updated the CI description in `README.md`: it previously said instrumented
+  database tests require a manual device/emulator; the workflow has run them
+  automatically on a GitHub-hosted emulator since the KVM/report-upload fixes
+  earlier today. Also noted the new changelog-entry gate step.
+  `signed-release` remains disabled — no signing secrets or the
+  `YONTE_SIGNED_RELEASE_ENABLED` repository variable are configured yet
+  (confirmed via `gh secret list` / `gh variable list`); this is expected
+  ahead of the project's first release, not a defect.
+
 ## Unreleased — fix missing Composable import after TASK 15 split (2026-09-03)
 
 - `BiometricUnlockRoute.kt` and `QuickUnlockSetupRoute.kt` were missing
