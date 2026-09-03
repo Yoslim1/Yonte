@@ -3,21 +3,20 @@ package com.yonte.app
 import android.content.Intent
 import android.os.Bundle
 import android.util.Base64
+import androidx.activity.viewModels
 import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.lifecycleScope
 import com.yonte.core.backup.BackupGateway
-import com.yonte.core.backup.ScheduledBackupWorker
 import com.yonte.core.database.NoteRepository
-import com.yonte.core.database.YonteDatabase
 import com.yonte.core.designsystem.YonteTheme
 import com.yonte.core.security.AppPinManager
 import com.yonte.core.security.BiometricGateCipher
@@ -35,7 +34,6 @@ import com.yonte.feature.onboarding.QuickUnlockSetupRoute
 import com.yonte.feature.onboarding.OnboardingRoute
 import com.yonte.feature.settings.SettingsRoute
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -52,48 +50,20 @@ class MainActivity : FragmentActivity() {
     @Inject lateinit var appPinManager: AppPinManager
     @Inject lateinit var biometricGateCipher: BiometricGateCipher
 
+    private val viewModel: MainViewModel by viewModels()
+
     private var sharedText by mutableStateOf<String?>(null)
     private var darkTheme by mutableStateOf(false)
     private var showSettings by mutableStateOf(false)
-    private var showOnboarding by mutableStateOf(true)
-    private var unlocked by mutableStateOf(false)
     private var isUnlocking by mutableStateOf(false)
-    private var unlockScreen by mutableStateOf<UnlockScreen?>(null)
-    private var createdPin by mutableStateOf<CharArray?>(null)
-    private var pinMode by mutableStateOf(PinFieldMode.VERIFY)
-    private var unlockErrorMessage by mutableStateOf<String?>(null)
-    private var isWarmingDatabase by mutableStateOf(false)
-
-    private enum class UnlockScreen { SETUP, PASSPHRASE, PIN, BIOMETRIC }
-
-    private fun onUnlocked() {
-        unlocked = true
-        isWarmingDatabase = true
-        lifecycleScope.launch {
-            withContext(Dispatchers.IO) {
-                runCatching { noteRepository.get() }
-            }
-            isWarmingDatabase = false
-        }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         sharedText = intent.sharedText()
-        showOnboarding = localKeyManager.isFirstRun()
 
-        if (!showOnboarding) {
-            // Clear session cache so cold start always requires authentication.
-            // The cache will be repopulated on successful unlock.
-            localKeyManager.clearSessionCache()
-            val method = localKeyManager.unlockMethod()
-            unlocked = false
-            unlockScreen = when (method) {
-                LocalKeyManager.METHOD_PIN -> UnlockScreen.PIN
-                LocalKeyManager.METHOD_BIOMETRIC -> UnlockScreen.BIOMETRIC
-                else -> UnlockScreen.PASSPHRASE
-            }
+        viewModel.setDatabaseWarmer {
+            withContext(Dispatchers.IO) { noteRepository.get() }
         }
 
         val biometricAvailable = BiometricManager.from(this)
@@ -101,62 +71,65 @@ class MainActivity : FragmentActivity() {
             BiometricManager.BIOMETRIC_SUCCESS
 
         setContent {
+            val uiState by viewModel.uiState.collectAsState()
+
             YonteTheme(darkTheme = darkTheme) {
                 when {
-                    showOnboarding -> OnboardingRoute(
+                    uiState.showOnboarding -> OnboardingRoute(
                         isProcessing = isUnlocking,
-                        onComplete = ::completeOnboarding,
+                        onComplete = { passphrase ->
+                            viewModel.completeOnboarding(
+                                passphrase = passphrase,
+                                isUnlocking = isUnlocking,
+                                onStarted = { isUnlocking = true },
+                                onFinished = { isUnlocking = false },
+                            )
+                        },
                     )
-                    unlockScreen == UnlockScreen.SETUP -> QuickUnlockSetupRoute(
+                    uiState.unlockScreen == MainUiState.UnlockScreen.SETUP -> QuickUnlockSetupRoute(
                         biometricAvailable = biometricAvailable,
                         isArabic = isArabic(),
                         onChooseBiometric = {
-                            localKeyManager.setUnlockMethod(LocalKeyManager.METHOD_BIOMETRIC)
+                            viewModel.chooseBiometricUnlock()
                             launchBiometricSetupPrompt {
-                                unlockScreen = null
-                                onUnlocked()
-                                refreshAutoBackupKeyCacheIfEnabled()
+                                viewModel.clearUnlockError()
+                                viewModel.onUnlocked()
                             }
                         },
-                        onChoosePin = {
-                            pinMode = PinFieldMode.CREATE
-                            unlockScreen = UnlockScreen.PIN
-                        },
-                        onSkip = {
-                            localKeyManager.setUnlockMethod(LocalKeyManager.METHOD_PASSPHRASE)
-                            unlockScreen = null
-                            onUnlocked()
-                            refreshAutoBackupKeyCacheIfEnabled()
-                        },
+                        onChoosePin = { viewModel.choosePinCreate() },
+                        onSkip = { viewModel.chooseSkipUnlock() },
                     )
-                    unlockScreen == UnlockScreen.PASSPHRASE -> PassphraseUnlockRoute(
+                    uiState.unlockScreen == MainUiState.UnlockScreen.PASSPHRASE -> PassphraseUnlockRoute(
                         isArabic = isArabic(),
-                        errorMessage = unlockErrorMessage,
-                        onSubmit = ::submitPassphrase,
-                    )
-                    unlockScreen == UnlockScreen.PIN -> PinRoute(
-                        mode = pinMode,
-                        isArabic = isArabic(),
-                        errorMessage = unlockErrorMessage,
-                        onSubmit = ::submitPin,
-                        onUsePassphraseInstead = {
-                            unlockScreen = UnlockScreen.PASSPHRASE
-                            unlockErrorMessage = null
+                        errorMessage = uiState.unlockErrorMessage,
+                        onSubmit = { passphrase ->
+                            viewModel.submitPassphrase(
+                                passphrase = passphrase,
+                                context = this@MainActivity,
+                                isUnlocking = isUnlocking,
+                                isArabic = isArabic(),
+                                onUnlockStarted = { isUnlocking = true },
+                                onUnlockFinished = { isUnlocking = false },
+                            )
                         },
                     )
-                    unlockScreen == UnlockScreen.BIOMETRIC -> BiometricUnlockRoute(
+                    uiState.unlockScreen == MainUiState.UnlockScreen.PIN -> PinRoute(
+                        mode = uiState.pinMode,
                         isArabic = isArabic(),
-                        errorMessage = unlockErrorMessage,
+                        errorMessage = uiState.unlockErrorMessage,
+                        onSubmit = { pin -> viewModel.submitPin(pin, isArabic()) },
+                        onUsePassphraseInstead = { viewModel.switchToPassphrase() },
+                    )
+                    uiState.unlockScreen == MainUiState.UnlockScreen.BIOMETRIC -> BiometricUnlockRoute(
+                        isArabic = isArabic(),
+                        errorMessage = uiState.unlockErrorMessage,
                         onTriggerBiometric = ::launchBiometricPrompt,
-                        onUseFallbackInstead = {
-                            unlockScreen = if (appPinManager.isPinSet()) UnlockScreen.PIN else UnlockScreen.PASSPHRASE
-                            unlockErrorMessage = null
-                        },
+                        onUseFallbackInstead = { viewModel.switchToPinOrPassphrase() },
                     )
-                    unlocked && isWarmingDatabase -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    uiState.unlocked && uiState.isWarmingDatabase -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
                     }
-                    unlocked -> NotesOrSettings()
+                    uiState.unlocked -> NotesOrSettings()
                 }
             }
         }
@@ -165,115 +138,8 @@ class MainActivity : FragmentActivity() {
     private fun isArabic(): Boolean =
         resources.configuration.layoutDirection == android.util.LayoutDirection.RTL
 
-    private fun completeOnboarding(passphrase: String) {
-        if (isUnlocking) return
-        isUnlocking = true
-        lifecycleScope.launch {
-            val chars = passphrase.toCharArray()
-            try {
-                withContext(Dispatchers.Default) {
-                    localKeyManager.setupPassphrase(chars)
-                }
-            } finally {
-                chars.fill('\u0000')
-            }
-            showOnboarding = false
-            isUnlocking = false
-            unlockScreen = UnlockScreen.SETUP
-        }
-    }
-
-    private fun submitPassphrase(passphrase: CharArray) {
-        if (isUnlocking) return
-        isUnlocking = true
-        unlockErrorMessage = null
-        lifecycleScope.launch {
-            val chars = passphrase.copyOf()
-            try {
-                withContext(Dispatchers.Default) {
-                    localKeyManager.unlock(chars)
-                }
-                // Argon2 never throws for a "wrong" passphrase — it just derives a
-                // different key silently. The only real verification is actually
-                // using that key against the encrypted database. We call
-                // YonteDatabase.get() directly (not through Hilt's noteRepository)
-                // so that a wrong key does not poison the Hilt-managed singletons;
-                // YonteDatabase's companion singleton handles key-change cleanup
-                // via its instanceKeyDigest check.
-                withContext(Dispatchers.IO) {
-                    val key = localKeyManager.cachedSessionKey()
-                        ?: error("No cached key after unlock")
-                    YonteDatabase.get(this@MainActivity, key).noteDao().getAll()
-                }
-                unlockScreen = null
-                onUnlocked()
-                refreshAutoBackupKeyCacheIfEnabled()
-            } catch (_: Exception) {
-                unlockErrorMessage = if (isArabic()) "كلمة السر غلط" else "Wrong passphrase"
-            } finally {
-                chars.fill('\u0000')
-                isUnlocking = false
-            }
-        }
-    }
-
-    private fun submitPin(pin: CharArray) {
-        unlockErrorMessage = null
-        if (pinMode == PinFieldMode.CREATE) {
-            val currentCreatedPin = createdPin
-            if (currentCreatedPin == null) {
-                // First entry: store PIN, switch to confirmation
-                createdPin = pin.copyOf()
-                pinMode = PinFieldMode.CREATE // stays CREATE for confirmation
-                unlockScreen = UnlockScreen.PIN
-            } else {
-                // Confirmation entry: verify match
-                if (!pin.contentEquals(currentCreatedPin)) {
-                    createdPin = null
-                    // PinRoute shows mismatch via its own state
-                    unlockScreen = UnlockScreen.PIN
-                } else {
-                    appPinManager.setPin(pin)
-                    localKeyManager.setUnlockMethod(LocalKeyManager.METHOD_PIN)
-                    localKeyManager.cachedSessionKey()?.let { localKeyManager.cachePinUnlockKey(it) }
-                    createdPin = null
-                    unlockScreen = null
-                    onUnlocked()
-                    refreshAutoBackupKeyCacheIfEnabled()
-                }
-            }
-        } else {
-            // Verification mode
-            if (appPinManager.lockoutSecondsRemaining() > 0) {
-                val secs = appPinManager.lockoutSecondsRemaining()
-                unlockErrorMessage = if (isArabic()) "انتظر $secs ثانية" else "Wait $secs seconds"
-                return
-            }
-            if (appPinManager.verify(pin)) {
-                val pinUnlockKey = localKeyManager.cachedPinUnlockKey()
-                if (pinUnlockKey == null) {
-                    unlockScreen = UnlockScreen.PASSPHRASE
-                    unlockErrorMessage = if (isArabic())
-                        "محتاجين نعيد الإعداد، ادخل كلمة السر" else "Setup needs to be refreshed — enter your passphrase"
-                    return
-                }
-                localKeyManager.cacheSessionKeyDirectly(pinUnlockKey)
-                unlockScreen = null
-                onUnlocked()
-                refreshAutoBackupKeyCacheIfEnabled()
-            } else {
-                val remaining = appPinManager.lockoutSecondsRemaining()
-                unlockErrorMessage = if (remaining > 0) {
-                    if (isArabic()) "انتظر $remaining ثانية" else "Wait $remaining seconds"
-                } else {
-                    if (isArabic()) "رمز غلط" else "Wrong PIN"
-                }
-            }
-        }
-    }
-
     private fun launchBiometricPrompt() {
-        unlockErrorMessage = null
+        viewModel.clearUnlockError()
         val executor = ContextCompat.getMainExecutor(this)
         val callback = object : BiometricPrompt.AuthenticationCallback() {
             override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
@@ -287,25 +153,18 @@ class MainActivity : FragmentActivity() {
                             Base64.NO_WRAP,
                         )
                         val sessionKey = cryptoCipher.doFinal(encryptedData)
-                        localKeyManager.cacheSessionKeyDirectly(sessionKey)
-                        unlockScreen = null
-                        onUnlocked()
-                        refreshAutoBackupKeyCacheIfEnabled()
+                        viewModel.handleBiometricUnlockSuccess(sessionKey)
                     } else {
-                        unlockErrorMessage = if (isArabic()) "فشل فتح القفل" else "Unlock failed"
+                        viewModel.handleBiometricUnlockFailure(isArabic())
                     }
                 } catch (_: Exception) {
-                    unlockErrorMessage = if (isArabic()) "فشل فتح القفل" else "Unlock failed"
+                    viewModel.handleBiometricUnlockFailure(isArabic())
                 }
             }
 
             override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                 super.onAuthenticationError(errorCode, errString)
-                if (errorCode != BiometricPrompt.ERROR_USER_CANCELED &&
-                    errorCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON
-                ) {
-                    unlockErrorMessage = errString.toString()
-                }
+                viewModel.handleBiometricUnlockError(errorCode, errString)
             }
         }
 
@@ -327,13 +186,10 @@ class MainActivity : FragmentActivity() {
                 BiometricPrompt.CryptoObject(cipher),
             )
         } catch (_: Exception) {
-            unlockErrorMessage = if (isArabic()) "فشل فتح القفل" else "Unlock failed"
+            viewModel.handleBiometricUnlockFailure(isArabic())
         }
     }
 
-    /** Confirms fingerprint via a live BiometricPrompt before writing the biometric
-     *  cache.  The "authentication succeeds, doFinal succeeds, cache is written" path
-     *  was verified by manual on-device testing after this task shipped. */
     private fun launchBiometricSetupPrompt(onDone: () -> Unit) {
         val sessionKey = localKeyManager.cachedSessionKey()
         if (sessionKey == null) { onDone(); return }
@@ -371,16 +227,6 @@ class MainActivity : FragmentActivity() {
         } catch (_: Exception) {
             onDone()
         }
-    }
-
-    /** Repopulates the auto-backup key cache after a successful interactive unlock,
-     * but only when automatic backup is configured. No-op otherwise, so users who
-     * never enable the feature expose no extra resident key. */
-    private fun refreshAutoBackupKeyCacheIfEnabled() {
-        val prefs = getSharedPreferences(ScheduledBackupWorker.PREFS_NAME, MODE_PRIVATE)
-        if (prefs.getString(ScheduledBackupWorker.KEY_DESTINATION_URI, null) == null) return
-        val key = localKeyManager.cachedSessionKey() ?: return
-        localKeyManager.cacheAutoBackupKey(key)
     }
 
     @Composable

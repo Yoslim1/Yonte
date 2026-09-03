@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased — TASK 16: extract MainViewModel from MainActivity (2026-09-03)
+
+- Split `MainActivity.kt` (418 lines) into a thin Activity + `MainViewModel`.
+  `MainViewModel.kt` is `@HiltViewModel` — safe because its three injected
+  dependencies (`LocalKeyManager`, `AppPinManager`, `BiometricGateCipher`) are
+  SharedPreferences/AndroidKeyStore-only and never trigger `YonteDatabase`
+  access. `noteRepository`, `backupGateway`, and `updateGateway` remain
+  `@Inject` fields on `MainActivity`. `MainUiState.kt` holds the unlock state
+  data class. `BiometricPrompt` construction stays in `MainActivity` (requires
+  `FragmentActivity`). Added `MainViewModelTest` covering PIN verify success,
+  lockout, passphrase fallback, and error clearing.
+
 ## Unreleased — fix wrong-passphrase crash (2026-09-03)
 
 - `submitPassphrase` in `MainActivity.kt` now validates the derived key against the
