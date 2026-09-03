@@ -17,6 +17,7 @@ import androidx.lifecycle.lifecycleScope
 import com.yonte.core.backup.BackupGateway
 import com.yonte.core.backup.ScheduledBackupWorker
 import com.yonte.core.database.NoteRepository
+import com.yonte.core.database.YonteDatabase
 import com.yonte.core.designsystem.YonteTheme
 import com.yonte.core.security.AppPinManager
 import com.yonte.core.security.BiometricGateCipher
@@ -191,6 +192,18 @@ class MainActivity : FragmentActivity() {
             try {
                 withContext(Dispatchers.Default) {
                     localKeyManager.unlock(chars)
+                }
+                // Argon2 never throws for a "wrong" passphrase — it just derives a
+                // different key silently. The only real verification is actually
+                // using that key against the encrypted database. We call
+                // YonteDatabase.get() directly (not through Hilt's noteRepository)
+                // so that a wrong key does not poison the Hilt-managed singletons;
+                // YonteDatabase's companion singleton handles key-change cleanup
+                // via its instanceKeyDigest check.
+                withContext(Dispatchers.IO) {
+                    val key = localKeyManager.cachedSessionKey()
+                        ?: error("No cached key after unlock")
+                    YonteDatabase.get(this@MainActivity, key).noteDao().getAll()
                 }
                 unlockScreen = null
                 onUnlocked()

@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased — fix wrong-passphrase crash (2026-09-03)
+
+- `submitPassphrase` in `MainActivity.kt` now validates the derived key against the
+  encrypted database (via `YonteDatabase.get().noteDao().getAll()`) inside the same
+  `try` block that shows the "wrong passphrase" error. Previously Argon2 silently
+  produced a valid but incorrect key for a wrong passphrase, `onUnlocked()` opened the
+  database in the background with that wrong key, and the app crashed when Compose first
+  tried to query notes. The fix calls `YonteDatabase.get()` directly (not through
+  Hilt's `noteRepository`) so a wrong key does not poison the Hilt-managed singletons;
+  `YonteDatabase`'s companion singleton handles key-change cleanup via its
+  `instanceKeyDigest` check. Existing instrumented tests in `core:database` already
+  cover the underlying "wrong key throws" assertion; this task wires the UI to surface
+  it to the user.
+
 ## Unreleased — README accuracy update (2026-09-03)
 
 - Updated the CI description in `README.md`: it previously said instrumented
