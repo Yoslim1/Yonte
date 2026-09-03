@@ -124,11 +124,34 @@ A Skill must never override a project-specific security, architecture, data-inte
 
 6. Subagent Policy
 
-For every non-trivial software task, specialized Subagents are mandatory.
+For every non-trivial software task, the primary agent MUST delegate via the
+`task` tool. It must NOT implement, review, or verify the change directly
+itself. This is a hard requirement, not a suggestion.
 
-The exact Subagent names are intentionally not specified here.
+The exact Subagent names are intentionally not specified here. Discover the
+available Subagents from the current OpenCode environment and assign them by
+role.
 
-Discover the available Subagents from the current OpenCode environment and assign them by role.
+Required call sequence for non-trivial changes:
+
+1. Call `task` with the implementer-role Subagent to make the change.
+2. Call `task` with the independent-review-role Subagent, passing it the
+   actual diff, to challenge the implementation. This Subagent runs in its
+   own context and must not simply echo the implementer's self-report.
+3. Call `task` with the verification-role Subagent to inspect actual CI
+   evidence (not the implementer's claims about CI) before declaring the
+   task complete.
+
+The primary agent's own role for non-trivial tasks is orchestration and
+final reporting to the user, not hands-on implementation. If the primary
+agent finds itself writing application code, reviewing its own diff, or
+declaring verification directly for a non-trivial task, it has violated
+this policy: stop, and restart the task through delegation instead.
+
+If a required Subagent role is genuinely unavailable in the current
+environment, do not silently perform that role yourself. Say so explicitly
+in the completion report, and do not claim independent review or
+verification occurred.
 
 Required roles for non-trivial changes:
 
