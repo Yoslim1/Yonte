@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — TASK 15: split AppLockGate.kt (2026-09-02)
+
+- Split `feature/onboarding/.../AppLockGate.kt` (248 lines) into one file per screen:
+  `QuickUnlockSetupRoute.kt`, `PinRoute.kt` (+ `PinFieldMode`), `BiometricUnlockRoute.kt`,
+  `PassphraseUnlockRoute.kt`. Pure mechanical split, verified byte-identical string
+  literals and unchanged `MainActivity.kt` imports. (commit `6d16e26`)
+
 ## Unreleased — TASK 14 follow-up fixes (2026-09-02)
 
 - Fixed `YonteDatabase.kt`: removed a leftover `// changelog-gate-test` debug comment
