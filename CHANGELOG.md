@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — Fix Compose recomposition regression by isolating unstable PIN field (2026-09-04)
+
+- Removed `createdPin: CharArray?` from `MainUiState` data class, which was making the
+  entire state class unstable for Compose's recomposition-skipping. Moved the field to a
+  plain private `var` in `MainViewModel` since it was never read by any composable.
+  (`MainUiState.kt`, `MainViewModel.kt`)
+- Added PIN `CharArray` zeroing in `submitPin` to match the established passphrase
+  security pattern: zeroing the input `pin` in a `finally` block, and zeroing the held
+  `createdPin` copy before releasing it on mismatch or success. (`MainViewModel.kt`)
+
 ## Unreleased — TASK 16: extract MainViewModel from MainActivity (2026-09-03)
 
 - Split `MainActivity.kt` (418 lines) into a thin Activity + `MainViewModel`.
