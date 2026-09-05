@@ -78,7 +78,7 @@ internal class MainViewModel @Inject constructor(
         }
     }
 
-    fun submitPassphrase(passphrase: CharArray, context: Context, isUnlocking: Boolean, isArabic: Boolean, onUnlockStarted: () -> Unit, onUnlockFinished: () -> Unit) {
+    fun submitPassphrase(passphrase: CharArray, isUnlocking: Boolean, isArabic: Boolean, onUnlockStarted: () -> Unit, onUnlockFinished: () -> Unit) {
         if (isUnlocking) return
         onUnlockStarted()
         _uiState.update { it.copy(unlockErrorMessage = null) }
@@ -91,7 +91,7 @@ internal class MainViewModel @Inject constructor(
                 withContext(Dispatchers.IO) {
                     val key = localKeyManager.cachedSessionKey()
                         ?: error("No cached key after unlock")
-                    YonteDatabase.get(context, key).noteDao().getAll()
+                    YonteDatabase.get(appContext, key).noteDao().getAll()
                 }
                 _uiState.update { it.copy(unlockScreen = null) }
                 onUnlocked()

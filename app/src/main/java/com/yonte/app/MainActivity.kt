@@ -105,7 +105,6 @@ class MainActivity : FragmentActivity() {
                         onSubmit = { passphrase ->
                             viewModel.submitPassphrase(
                                 passphrase = passphrase,
-                                context = this@MainActivity,
                                 isUnlocking = isUnlocking,
                                 isArabic = isArabic(),
                                 onUnlockStarted = { isUnlocking = true },
