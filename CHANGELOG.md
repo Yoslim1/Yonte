@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased — Fix Activity Context leak and SQLite cursor leak (2026-09-04)
+
+- `MainViewModel.submitPassphrase` no longer takes an external `Context` parameter;
+  it uses the already-injected `@ApplicationContext appContext` when validating the
+  derived key via `YonteDatabase.get(appContext, key)`, so the Activity Context
+  passed from `MainActivity` can no longer leak into the ViewModel scope.
+  (`app/.../MainViewModel.kt`, `app/.../MainActivity.kt`)
+- `NoteRepository.search()` now wraps the raw SQLite cursor from
+  `database.openHelper.readableDatabase.query(...)` in `.use { }`, guaranteeing
+  the cursor is closed even when an exception is thrown; the existing
+  try/catch-and-fallback-to-`searchFallback` behavior is unchanged.
+  (`core/database/.../NoteRepository.kt`)
+
 ## Unreleased — Fix Compose recomposition regression by isolating unstable PIN field (2026-09-04)
 
 - Removed `createdPin: CharArray?` from `MainUiState` data class, which was making the

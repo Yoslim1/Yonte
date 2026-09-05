@@ -69,13 +69,13 @@ class NoteRepository(private val database: YonteDatabase) {
         if (normalized.isBlank()) return dao.searchFallback("")
         return try {
             val escaped = normalized.replace("'", "''")
-            val rows = database.openHelper.readableDatabase.query(
-                SimpleSQLiteQuery("SELECT note_id FROM notes_fts WHERE notes_fts MATCH ?", arrayOf("$escaped*"))
-            )
-            val ids = buildList {
-                while (rows.moveToNext()) add(rows.getString(0))
+            val ids = database.openHelper.readableDatabase.query(
+                SimpleSQLiteQuery("SELECT note_id FROM notes_fts WHERE notes_fts MATCH ?", arrayOf("$escaped*")),
+            ).use { rows ->
+                buildList {
+                    while (rows.moveToNext()) add(rows.getString(0))
+                }
             }
-            rows.close()
             if (ids.isEmpty()) emptyList() else dao.getActiveByIds(ids)
         } catch (_: Exception) {
             dao.searchFallback(normalized)
