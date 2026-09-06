@@ -245,7 +245,7 @@ internal class MainViewModel @Inject constructor(
             val result = withContext(Dispatchers.IO) {
                 runCatching { warmDatabase?.invoke() }
             }
-            val mismatch = result.exceptionOrNull?.let(::isDatabaseVersionMismatch) ?: false
+            val mismatch = result.exceptionOrNull()?.let(::isDatabaseVersionMismatch) ?: false
             if (mismatch) {
                 YonteDatabase.close()
             }

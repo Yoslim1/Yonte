@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — Fix `exceptionOrNull()` call syntax in database version mismatch handler (2026-09-06)
+
+- `app/.../MainViewModel.kt:248`: corrected `exceptionOrNull` (property access) to
+  `exceptionOrNull()` (function call) in `onUnlocked()`, fixing a Kotlin compilation
+  error introduced in the previous commit.
+
 ## Unreleased — Remove destructive downgrade fallback; block on database version mismatch (2026-09-05)
 
 - `core/database/.../YonteDatabase.kt`: removed
