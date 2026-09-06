@@ -5,7 +5,13 @@ import android.content.SharedPreferences
 import com.yonte.core.security.AppPinManager
 import com.yonte.core.security.BiometricGateCipher
 import com.yonte.core.security.LocalKeyManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -146,6 +152,58 @@ class MainViewModelTest {
 
         viewModel.clearUnlockError()
         assertNull(viewModel.uiState.value.unlockErrorMessage)
+    }
+
+    @Test
+    fun `onUnlocked with missing migration warmer shows blocking database state`() = runTest {
+        val testDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(testDispatcher)
+        try {
+            val viewModel = createViewModel()
+            viewModel.setDatabaseWarmer {
+                throw IllegalStateException(
+                    "A migration from 2 to 1 was required but not found. " +
+                        "Please provide the necessary Migration path via " +
+                        "RoomDatabase.Builder.addMigration(Migration ...).",
+                )
+            }
+
+            viewModel.onUnlocked()
+            withTimeout(10_000) {
+                while (viewModel.uiState.value.isWarmingDatabase) {
+                    delay(10)
+                }
+            }
+
+            val state = viewModel.uiState.value
+            assertTrue(state.unlocked)
+            assertFalse(state.isWarmingDatabase)
+            assertTrue(state.isDatabaseBlocked)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun `missing migration message is detected as version mismatch`() {
+        val error = IllegalStateException(
+            "A migration from 3 to 2 was required but not found. " +
+                "Please provide the necessary Migration path.",
+        )
+        assertTrue(isDatabaseVersionMismatch(error))
+    }
+
+    @Test
+    fun `wrapped missing migration is detected through the cause chain`() {
+        val root = IllegalStateException("A migration from 2 to 1 was required but not found.")
+        assertTrue(isDatabaseVersionMismatch(RuntimeException("open failed", root)))
+    }
+
+    @Test
+    fun `unrelated errors are not version mismatches`() {
+        assertFalse(isDatabaseVersionMismatch(IllegalStateException("Wrong passphrase")))
+        assertFalse(isDatabaseVersionMismatch(RuntimeException("nope")))
+        assertFalse(isDatabaseVersionMismatch(IllegalStateException("A migration ran fine")))
     }
 
     private fun createViewModel(): MainViewModel {

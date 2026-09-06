@@ -35,11 +35,18 @@ import com.yonte.feature.onboarding.OnboardingRoute
 import com.yonte.feature.settings.SettingsRoute
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 
 @AndroidEntryPoint
 class MainActivity : FragmentActivity() {
@@ -75,6 +82,7 @@ class MainActivity : FragmentActivity() {
 
             YonteTheme(darkTheme = darkTheme) {
                 when {
+                    uiState.isDatabaseBlocked -> DatabaseBlockedRoute(isArabic = isArabic())
                     uiState.showOnboarding -> OnboardingRoute(
                         isProcessing = isUnlocking,
                         onComplete = { passphrase ->
@@ -225,6 +233,36 @@ class MainActivity : FragmentActivity() {
             BiometricPrompt(this, executor, callback).authenticate(promptInfo, BiometricPrompt.CryptoObject(cipher))
         } catch (_: Exception) {
             onDone()
+        }
+    }
+
+    @Composable
+    private fun DatabaseBlockedRoute(isArabic: Boolean) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = if (isArabic) {
+                        "قاعدة البيانات تحتاج إصدارًا أحدث من Yonte"
+                    } else {
+                        "Your notes need a newer version of Yonte"
+                    },
+                    style = MaterialTheme.typography.titleLarge,
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    text = if (isArabic) {
+                        "هذا الإصدار لا يستطيع فتح قاعدة البيانات. حدّث Yonte إلى آخر إصدار للمتابعة. ملاحظاتك سليمة ولم يُحذف أي شيء."
+                    } else {
+                        "This version cannot open your database. Update Yonte to the latest version to continue. Your notes are safe — nothing was deleted."
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
     }
 

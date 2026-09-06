@@ -6,6 +6,7 @@ internal data class MainUiState(
     val showOnboarding: Boolean = true,
     val unlocked: Boolean = false,
     val isWarmingDatabase: Boolean = false,
+    val isDatabaseBlocked: Boolean = false,
     val unlockScreen: UnlockScreen? = null,
     val pinMode: PinFieldMode = PinFieldMode.VERIFY,
     val unlockErrorMessage: String? = null,

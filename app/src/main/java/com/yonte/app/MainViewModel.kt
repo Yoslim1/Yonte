@@ -20,6 +20,29 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
+/** Room reports a missing migration path (downgrade to an older APK, or a forgotten
+ * upgrade migration) as an [IllegalStateException] whose message states that
+ * "A migration from X to Y was required but not found". The failure may be wrapped,
+ * so the whole cause chain is inspected. A match means the encrypted data is intact
+ * but this app version must not proceed: the caller must close the database and
+ * surface the blocking UI instead of unlocking into crashes. */
+internal fun isDatabaseVersionMismatch(error: Throwable): Boolean {
+    var current: Throwable? = error
+    while (current != null) {
+        if (current is IllegalStateException) {
+            val message = current.message
+            if (message != null &&
+                message.contains("A migration from") &&
+                message.contains("was required but not found")
+            ) {
+                return true
+            }
+        }
+        current = current.cause
+    }
+    return false
+}
+
 @HiltViewModel
 internal class MainViewModel @Inject constructor(
     @ApplicationContext private val appContext: Context,
@@ -96,9 +119,20 @@ internal class MainViewModel @Inject constructor(
                 _uiState.update { it.copy(unlockScreen = null) }
                 onUnlocked()
                 refreshAutoBackupKeyCacheIfEnabled()
-            } catch (_: Exception) {
-                _uiState.update {
-                    it.copy(unlockErrorMessage = if (isArabic) "كلمة السر غلط" else "Wrong passphrase")
+            } catch (e: Exception) {
+                if (isDatabaseVersionMismatch(e)) {
+                    YonteDatabase.close()
+                    _uiState.update {
+                        it.copy(
+                            unlockScreen = null,
+                            unlockErrorMessage = null,
+                            isDatabaseBlocked = true,
+                        )
+                    }
+                } else {
+                    _uiState.update {
+                        it.copy(unlockErrorMessage = if (isArabic) "كلمة السر غلط" else "Wrong passphrase")
+                    }
                 }
             } finally {
                 chars.fill('\u0000')
@@ -208,10 +242,19 @@ internal class MainViewModel @Inject constructor(
     fun onUnlocked() {
         _uiState.update { it.copy(unlocked = true, isWarmingDatabase = true) }
         viewModelScope.launch {
-            withContext(Dispatchers.IO) {
+            val result = withContext(Dispatchers.IO) {
                 runCatching { warmDatabase?.invoke() }
             }
-            _uiState.update { it.copy(isWarmingDatabase = false) }
+            val mismatch = result.exceptionOrNull?.let(::isDatabaseVersionMismatch) ?: false
+            if (mismatch) {
+                YonteDatabase.close()
+            }
+            _uiState.update {
+                it.copy(
+                    isWarmingDatabase = false,
+                    isDatabaseBlocked = it.isDatabaseBlocked || mismatch,
+                )
+            }
         }
     }
 
