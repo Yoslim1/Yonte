@@ -34,11 +34,21 @@ abstract class YonteDatabase : RoomDatabase() {
             database
         }
 
-        /** Closes and forgets the process-local instance, if one exists. */
+        /** Closes and forgets the process-local instance, if one exists. Never throws:
+         * safe to call with no instance, an already-closed one, or after a failed open
+         * (e.g. a version-mismatch failure that must surface a blocking UI instead). */
         fun close() = synchronized(this) {
-            instance?.close()
-            instance = null
-            instanceKeyDigest = null
+            try {
+                val current = instance
+                if (current != null && current.isOpen) {
+                    current.close()
+                }
+            } catch (_: Exception) {
+                // Best-effort cleanup only; a close-path failure must not crash the caller.
+            } finally {
+                instance = null
+                instanceKeyDigest = null
+            }
         }
 
         private fun digest(key: ByteArray): ByteArray =
@@ -67,7 +77,6 @@ abstract class YonteDatabase : RoomDatabase() {
                         }
                     }
                 })
-                .fallbackToDestructiveMigrationOnDowngrade()
                 .build()
         }
     }
