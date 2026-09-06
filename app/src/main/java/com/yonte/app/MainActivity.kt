@@ -192,8 +192,17 @@ class MainActivity : FragmentActivity() {
                 promptInfo,
                 BiometricPrompt.CryptoObject(cipher),
             )
-        } catch (_: Exception) {
-            viewModel.handleBiometricUnlockFailure(isArabic())
+        } catch (e: Exception) {
+            if (e is android.security.keystore.KeyPermanentlyInvalidatedException ||
+                generateSequence(e as Throwable?) { it.cause }.any { it is android.security.keystore.KeyPermanentlyInvalidatedException }
+            ) {
+                localKeyManager.setUnlockMethod(
+                    if (appPinManager.isPinSet()) LocalKeyManager.METHOD_PIN else LocalKeyManager.METHOD_PASSPHRASE,
+                )
+                viewModel.switchToPinOrPassphrase()
+            } else {
+                viewModel.handleBiometricUnlockFailure(isArabic())
+            }
         }
     }
 
