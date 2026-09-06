@@ -296,4 +296,10 @@ internal class MainViewModel @Inject constructor(
         val key = localKeyManager.cachedSessionKey() ?: return
         localKeyManager.cacheAutoBackupKey(key)
     }
+
+    override fun onCleared() {
+        super.onCleared()
+        createdPin?.fill('\u0000')
+        createdPin = null
+    }
 }
