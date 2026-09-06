@@ -1,5 +1,32 @@
 # Changelog
 
+## Unreleased — Memory hygiene, payload validation, permanent-failure handling (2026-09-06)
+
+- `feature/settings/.../SettingsViewModel.kt`: zero `sessionKey` and `localSalt`
+  after use in `export()` — the `finally` block previously had an incorrect comment
+  claiming the array was not a local copy; `LocalKeyManager.cachedSessionKey()` returns
+  a fresh `ByteArray` on every call that was never zeroed.
+- `core/security/.../AppPinManager.kt`: zero `actual` and `expected` byte arrays in
+  `verify()` after comparison, preventing Argon2-derived hashes from lingering in
+  memory.
+- `core/backup/.../BackupCodec.kt`, `core/security/.../EncryptionManager.kt`: validate
+  length prefixes before allocating salt/IV byte arrays in `decrypt()`; a corrupted
+  payload with a garbage length now throws `IllegalArgumentException` quickly instead
+  of attempting an unbounded allocation.
+- `app/.../MainViewModel.kt`: zero `createdPin` in `onCleared()` so a PIN-creation
+  flow abandoned via ViewModel teardown (back navigation, config change) does not
+  leave the partial PIN in memory until GC. (Hard process kill cannot be intercepted;
+  this narrows the window.)
+- `core/database/.../DatabaseUtils.kt`, `core/backup/.../ScheduledBackupWorker.kt`,
+  `app/.../MainViewModel.kt`: moved `isDatabaseVersionMismatch` classifier to
+  `core:database` so both `ScheduledBackupWorker` and `MainViewModel` share it;
+  `ScheduledBackupWorker` now returns `Result.failure()` for database-version-mismatch
+  errors instead of retrying forever on a permanently unrecoverable condition.
+- `app/.../MainActivity.kt`: detect `KeyPermanentlyInvalidatedException` (new
+  fingerprint enrolled or device credential changed) on the biometric unlock path and
+  permanently switch the unlock method to PIN or passphrase, preventing the biometric
+  screen from being shown on every cold start when it can never succeed again.
+
 ## Unreleased — Fix `exceptionOrNull()` call syntax in database version mismatch handler (2026-09-06)
 
 - `app/.../MainViewModel.kt:248`: corrected `exceptionOrNull` (property access) to
