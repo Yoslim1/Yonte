@@ -27,8 +27,12 @@ class BackupCodec {
 
     fun decrypt(payload: ByteArray, passphrase: CharArray): ByteArray {
         val buffer = ByteBuffer.wrap(payload)
-        val salt = ByteArray(buffer.int).also(buffer::get)
-        val iv = ByteArray(buffer.int).also(buffer::get)
+        val saltLen = buffer.int
+        require(saltLen in 0..64) { "Corrupt payload: invalid salt length $saltLen" }
+        val salt = ByteArray(saltLen).also(buffer::get)
+        val ivLen = buffer.int
+        require(ivLen in 0..64) { "Corrupt payload: invalid IV length $ivLen" }
+        val iv = ByteArray(ivLen).also(buffer::get)
         val ciphertext = ByteArray(buffer.remaining()).also(buffer::get)
         val key = Argon2Kdf.deriveWithSalt(passphrase, salt)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")

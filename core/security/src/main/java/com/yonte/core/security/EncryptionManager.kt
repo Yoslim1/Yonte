@@ -41,7 +41,9 @@ class EncryptionManager(private val alias: String = "yonte_backup_key") : Sessio
 
     override fun decrypt(payload: ByteArray): ByteArray {
         val buffer = ByteBuffer.wrap(payload)
-        val iv = ByteArray(buffer.int).also(buffer::get)
+        val ivLen = buffer.int
+        require(ivLen in 0..64) { "Corrupt payload: invalid IV length $ivLen" }
+        val iv = ByteArray(ivLen).also(buffer::get)
         val ciphertext = ByteArray(buffer.remaining()).also(buffer::get)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.DECRYPT_MODE, getOrCreateKey(), GCMParameterSpec(128, iv))
