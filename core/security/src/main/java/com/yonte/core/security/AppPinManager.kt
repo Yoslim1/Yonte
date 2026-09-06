@@ -25,18 +25,23 @@ class AppPinManager(context: Context) {
         val salt = Base64.decode(prefs.getString(KEY_SALT, null) ?: return false, Base64.NO_WRAP)
         val expected = Base64.decode(prefs.getString(KEY_HASH, null) ?: return false, Base64.NO_WRAP)
         val actual = Argon2Kdf.deriveWithSalt(pin, salt)
-        val matches = actual.contentEquals(expected)
-        if (matches) {
-            prefs.edit().putInt(KEY_ATTEMPTS, 0).putLong(KEY_LOCKOUT_UNTIL, 0L).apply()
-        } else {
-            val attempts = prefs.getInt(KEY_ATTEMPTS, 0) + 1
-            val lockoutSeconds = if (attempts >= 5) 30L * (1 shl (attempts - 5).coerceAtMost(6)) else 0L
-            prefs.edit()
-                .putInt(KEY_ATTEMPTS, attempts)
-                .putLong(KEY_LOCKOUT_UNTIL, if (lockoutSeconds > 0) System.currentTimeMillis() + lockoutSeconds * 1000 else 0L)
-                .apply()
+        try {
+            val matches = actual.contentEquals(expected)
+            if (matches) {
+                prefs.edit().putInt(KEY_ATTEMPTS, 0).putLong(KEY_LOCKOUT_UNTIL, 0L).apply()
+            } else {
+                val attempts = prefs.getInt(KEY_ATTEMPTS, 0) + 1
+                val lockoutSeconds = if (attempts >= 5) 30L * (1 shl (attempts - 5).coerceAtMost(6)) else 0L
+                prefs.edit()
+                    .putInt(KEY_ATTEMPTS, attempts)
+                    .putLong(KEY_LOCKOUT_UNTIL, if (lockoutSeconds > 0) System.currentTimeMillis() + lockoutSeconds * 1000 else 0L)
+                    .apply()
+            }
+            return matches
+        } finally {
+            actual.fill(0)
+            expected.fill(0)
         }
-        return matches
     }
 
     /** 0 if not currently locked out. */
