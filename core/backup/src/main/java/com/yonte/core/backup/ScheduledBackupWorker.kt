@@ -7,6 +7,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.yonte.core.database.NoteRepository
 import com.yonte.core.database.YonteDatabase
+import com.yonte.core.database.isDatabaseVersionMismatch
 import com.yonte.core.security.EncryptionManager
 import com.yonte.core.security.LocalKeyManager
 import java.time.LocalDateTime
@@ -48,8 +49,12 @@ class ScheduledBackupWorker(
                 stream.write(envelope.toByteArray(Charsets.UTF_8))
             } ?: return Result.failure()
             Result.success()
-        } catch (_: Exception) {
-            Result.retry()
+        } catch (e: Exception) {
+            if (isDatabaseVersionMismatch(e)) {
+                Result.failure() // permanent — no amount of retrying opens an incompatible database
+            } else {
+                Result.retry()
+            }
         }
     }
 

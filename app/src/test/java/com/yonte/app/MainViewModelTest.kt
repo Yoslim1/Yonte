@@ -2,6 +2,7 @@ package com.yonte.app
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.yonte.core.database.isDatabaseVersionMismatch
 import com.yonte.core.security.AppPinManager
 import com.yonte.core.security.BiometricGateCipher
 import com.yonte.core.security.LocalKeyManager
