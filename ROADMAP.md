@@ -142,10 +142,10 @@ NotesEmptyState.kt           (كان EmptyWorkspace)
 abstract class YonteDatabase : RoomDatabase() {
     abstract fun noteDao(): NoteDao
     ...
-    .fallbackToDestructiveMigrationOnDowngrade()
 ملاحظات على الكود الحالي:
 ✅ exportSchema = true — صح، نفس ممارسة Knote الجيدة.
-✅ fallbackToDestructiveMigrationOnDowngrade() — مش fallbackToDestructiveMigration() العادي. يعني الحماية دي بس لحالة الـ downgrade (نادرة جدًا)، مش الـ upgrade العادي. قرار صحيح تمامًا، ومطابق للدرس اللي اتعلمناه من Knote.
+السياسة النهائية: ممنوع أي fallback مدمّر — لا `fallbackToDestructiveMigration()` للـ upgrade ولا `fallbackToDestructiveMigrationOnDowngrade()` للـ downgrade. السطر اتشال نهائيًا من `YonteDatabase`. لو نسخة قديمة حاولت تفتح قاعدة بيانات أحدث (downgrade)، أو لو migration ناقصة، Room بيرمي `IllegalStateException` والتطبيق بيعرض شاشة حاجبة (`isDatabaseBlocked` + `DatabaseBlockedRoute` في `:app`) ويقفل قاعدة البيانات — البيانات المشفّرة محفوظة ومفيش أي مسح تلقائي.
+⚠️ تحذير الـ migration المنسية: نسخة برقم `version` جديد من غير `migration` صريحة هترمي نفس الاستثناء في التشغيل، والتطبيق هيفضل واقف على الشاشة الحاجبة لحد ما تحديث لاحق يشحن الـ migration الناقصة. عشان كده: أي زيادة `version` لازم تتشحن مع الـ `migration` بتاعتها + `migration test`، من غير استثناء.
 ⚠️ جدول الـ FTS5 (notes_fts) بيتعمل بـ execSQL يدوي جوّه onCreate callback، مش عبر Room's @Fts4/@Fts5 entity annotation. ده شغال، لكن Room مش عارف بوجود الجدول ده رسميًا — أي migration مستقبلية تلمس الملاحظات لازم تتذكر تتعامل مع notes_fts يدويًا برضو، لأن Room مش هيعملها تلقائي.
 استراتيجية التوسع (لكل مرحلة قادمة):
 القاعدة الأساسية: زيادة version + migration صريح لكل تغيير schema — نفس انضباط Knote بالظبط، من أول يوم مش بعد ما نتعلم الدرس بالطريقة الصعبة.
@@ -200,7 +200,7 @@ data class ExpenseEntity(
 قاعدة صارمة: أي قيمة مالية Long (أصغر وحدة عملة) أبدًا مش Float/Double — أخطاء التقريب في العملات مشكلة حقيقية وشائعة، ونمنعها من الـ type نفسه.
 المرحلة دي لازم تراجعة أمنية كاملة زي KeyManager بتاع Knote بالظبط قبل ما تتفعل — مش ميزة عادية.
 سياسة الـ Migration (نفس نمط MIGRATION_POLICY.md بتاع Knote، لكن مكتوبة من الأول مش بعد المشكلة):
-أي تغيير schema = migration صريح + version جديد. ممنوع fallbackToDestructiveMigration() العادي نهائيًا.
+أي تغيير schema = migration صريح + version جديد. ممنوع أي fallback مدمّر نهائيًا — لا للـ upgrade ولا للـ downgrade.
 كل migration بيتحط في ملف منفصل MigrationsNtoM.kt جوّه core:database (مش كلهم في YonteDatabase.kt نفسه — بيرجع لقانون توزيع الملفات في القسم 4).
 Migration test (MigrationTestHelper) إلزامي من أول migration حقيقية — مش نأجله زي ما حصل في Knote.
 7) الأمان والنسخ الاحتياطي

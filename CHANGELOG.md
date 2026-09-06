@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased — Remove destructive downgrade fallback; block on database version mismatch (2026-09-05)
+
+- `core/database/.../YonteDatabase.kt`: removed
+  `.fallbackToDestructiveMigrationOnDowngrade()` so a downgrade (older APK over a
+  newer encrypted database) can never silently wipe user data; the FTS5 `onCreate`
+  callback is unchanged. `YonteDatabase.close()` is now defensively safe (null /
+  already-closed guard, never throws) so mismatch paths can always clean up.
+- `app/.../MainViewModel.kt`, `app/.../MainUiState.kt`, `app/.../MainActivity.kt`:
+  Room missing-migration `IllegalStateException` ("A migration from ..." +
+  "was required but not found", cause chain included) is now classified as a
+  database version mismatch. Both `submitPassphrase` and the `onUnlocked` warmer
+  close the database and raise blocking `isDatabaseBlocked` state instead of
+  unlocking into crashes; `MainActivity` renders a blocking `DatabaseBlockedRoute`
+  (EN + AR) telling the user to update while reassuring that notes were not deleted.
+- `app/.../MainViewModelTest.kt`: added coverage for the `onUnlocked` warmer
+  mismatch (blocking state, warming cleared) and for the mismatch classifier
+  (direct match, wrapped cause, non-match rejection).
+- `ROADMAP.md` (Data Layer): documented the final no-destructive-fallback policy
+  and the forgotten-migration caveat (a version bump without its migration ships
+  the blocking screen until a later update provides it).
+
 ## Unreleased — Fix Activity Context leak and SQLite cursor leak (2026-09-04)
 
 - `MainViewModel.submitPassphrase` no longer takes an external `Context` parameter;
