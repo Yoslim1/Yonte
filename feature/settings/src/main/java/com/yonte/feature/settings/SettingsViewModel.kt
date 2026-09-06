@@ -72,7 +72,8 @@ internal class SettingsViewModel(
                 }.onSuccess { onResult(true) }
                     .onFailure { onResult(false) }
             } finally {
-                // sessionKey is not our copy to clear; it lives in LocalKeyManager
+                sessionKey.fill(0)
+                localSalt.fill(0)
             }
         }
     }
