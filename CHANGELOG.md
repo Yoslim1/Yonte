@@ -1,5 +1,42 @@
 # Changelog
 
+## Unreleased — TASK 23: Data flow hardening — backup integrity, FTS sync, backup lifecycle (2026-09-07)
+
+- `core/backup/.../BackupService.kt`: added `isArchived` and `isTrashed` fields
+  to `BackupNote` with `false` defaults for backward-compatible import of old backups;
+  `buildNotesPayload` now writes both keys; new `parseBackupNote` helper reads
+  them with `optBoolean` fallbacks; `readEnvelope` delegates to `parseBackupNote`.
+- `core/backup/.../ScheduledBackupWorker.kt`: backup payload now includes the
+  note's archive and trash state.
+- `feature/settings/.../SettingsViewModel.kt`: export and import paths now carry
+  `isArchived` / `isTrashed` through `BackupNote` ↔ `NoteEntity` conversion
+  instead of hard-coding `false`.
+- `core/backup/.../BackupService.kt`: added `MAX_BACKUP_FILE_BYTES` (16 MiB)
+  constant and `readBackupBytes` bounded-read helper; `readEnvelope` uses
+  `readBackupBytes` instead of unbounded `readBytes()`; `buildEncryptedEnvelope`
+  rejects envelopes exceeding the size limit before writing.
+- `core/backup/.../BackupCodec.kt`: `decrypt` now validates fixed-width header
+  fields (salt and IV lengths) before invoking the expensive Argon2 KDF,
+  replacing the looser range check from TASK 22; oversized payloads are rejected
+  before any key derivation.
+- `core/database/.../NoteRepository.kt`: `setPinned`, `setArchived`, `setTrashed`,
+  `save`, and `restore` are now wrapped in `database.withTransaction` with FTS
+  re-sync, preventing stale search results after archive/unarchive/trash/restore;
+  added `observeAll()` method.
+- `core/database/.../NoteDao.kt`: added `observeAll()` query for future
+  collection views sharing a single stream.
+- `feature/settings/.../SettingsUiState.kt`: added `isBackupBusy` field.
+- `feature/settings/.../SettingsViewModel.kt`: export and import guard on
+  `isBackupBusy` to prevent concurrent operations; key material is zeroed even
+  on cancellation via `CoroutineStart.UNDISPATCHED` + `finally` blocks.
+- `feature/settings/.../SettingsDataSection.kt`: Export and Import buttons are
+  disabled while `isBackupBusy` is true; shows "Processing backup…" indicator.
+- `core/backup/src/test/.../BackupCodecTest.kt`: added tests verifying that
+  malformed headers and oversized payloads are rejected before key derivation.
+- `core/backup/src/test/.../BackupImportLimitTest.kt` (new): tests for
+  `readBackupBytes` bounded read accepting valid input and rejecting oversized
+  input.
+
 ## Unreleased — Memory hygiene, payload validation, permanent-failure handling (2026-09-06)
 
 - `feature/settings/.../SettingsViewModel.kt`: zero `sessionKey` and `localSalt`
