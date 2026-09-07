@@ -60,8 +60,15 @@ internal fun SettingsData(
     Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text(if (isArabic) "بياناتك محلية على جهازك" else "Your data stays on this device", color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Button(onClick = onExport, modifier = Modifier.weight(1f)) { Text(if (isArabic) "تصدير" else "Export") }
-            OutlinedButton(onClick = onImport, modifier = Modifier.weight(1f)) { Text(if (isArabic) "استيراد" else "Import") }
+            Button(onClick = onExport, enabled = !uiState.isBackupBusy, modifier = Modifier.weight(1f)) { Text(if (isArabic) "تصدير" else "Export") }
+            OutlinedButton(onClick = onImport, enabled = !uiState.isBackupBusy, modifier = Modifier.weight(1f)) { Text(if (isArabic) "استيراد" else "Import") }
+        }
+
+        if (uiState.isBackupBusy) {
+            Text(
+                if (isArabic) "جارٍ معالجة النسخة الاحتياطية…" else "Processing backup…",
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
 
         Spacer(Modifier.height(8.dp))

@@ -15,4 +15,5 @@ internal data class SettingsUiState(
     val backupSizeBytes: Long = 0L,
     val showImportPassphraseDialog: Boolean = false,
     val pendingImportUri: Uri? = null,
+    val isBackupBusy: Boolean = false,
 )
