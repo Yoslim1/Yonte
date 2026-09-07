@@ -1,11 +1,13 @@
 package com.yonte.core.backup
 
 import com.yonte.core.security.Argon2Kdf
+import java.nio.ByteBuffer
 import java.security.GeneralSecurityException
 import java.security.MessageDigest
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Before
 import org.junit.Test
 
@@ -65,5 +67,35 @@ class BackupCodecTest {
     fun `empty plaintext round-trips`() {
         val encrypted = codec.encrypt(ByteArray(0), "empty-body".toCharArray())
         assertArrayEquals(ByteArray(0), codec.decrypt(encrypted, "empty-body".toCharArray()))
+    }
+
+    @Test
+    fun `malformed headers are rejected before key derivation`() {
+        val encrypted = codec.encrypt(payload, "backup-pass".toCharArray())
+        Argon2Kdf.installKdfEngineForTesting { _, _ -> error("Malformed input reached KDF") }
+        for (length in listOf(Int.MIN_VALUE, -1, 0, 15, 17, Int.MAX_VALUE)) {
+            val malformed = encrypted.copyOf()
+            ByteBuffer.wrap(malformed).putInt(0, length)
+            assertThrows(IllegalArgumentException::class.java) {
+                codec.decrypt(malformed, charArrayOf())
+            }
+        }
+        for (length in listOf(Int.MIN_VALUE, -1, 0, 11, 13, Int.MAX_VALUE)) {
+            val malformed = encrypted.copyOf()
+            ByteBuffer.wrap(malformed).putInt(20, length)
+            assertThrows(IllegalArgumentException::class.java) {
+                codec.decrypt(malformed, charArrayOf())
+            }
+        }
+        Argon2Kdf.installKdfEngineForTesting(null)
+    }
+
+    @Test
+    fun `oversized ciphertext rejected before key derivation`() {
+        Argon2Kdf.installKdfEngineForTesting { _, _ -> error("Oversized input reached KDF") }
+        assertThrows(IllegalArgumentException::class.java) {
+            codec.decrypt(ByteArray(MAX_BACKUP_FILE_BYTES + 1), charArrayOf())
+        }
+        Argon2Kdf.installKdfEngineForTesting(null)
     }
 }
