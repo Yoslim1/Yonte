@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — TASK 24: Settings UI for unlock method configuration (2026-09-07)
+
+- Added Security section to Settings allowing users to view and change their unlock
+  method (passphrase, PIN, or biometric) after onboarding.
+- Settings screen now shows the current unlock method and lets users switch between
+  methods with clear descriptions.
+- Relevant key caches are cleared when switching away from a method.
+- Reuses existing onboarding UI patterns for consistency.
+
 ## Unreleased — TASK 23: Data flow hardening — backup integrity, FTS sync, backup lifecycle (2026-09-07)
 
 - `core/backup/.../BackupService.kt`: added `isArchived` and `isTrashed` fields
