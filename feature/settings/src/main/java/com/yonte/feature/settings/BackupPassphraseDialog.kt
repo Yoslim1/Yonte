@@ -66,6 +66,15 @@ fun BackupPassphraseDialog(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (mode == BackupPassphraseMode.IMPORT) {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        if (isArabic) "تنبيه: الاستيراد يستبدل الملاحظات التي لها نفس المعرّف بمحتوى النسخة الاحتياطية. صدّر نسخة من بياناتك الحالية أولًا إذا أردت الاحتفاظ بها."
+                        else "Import replaces notes with matching IDs using the backup content. Export your current data first if you want to keep a copy.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
                 Spacer(Modifier.height(16.dp))
                 OutlinedTextField(
                     value = passphrase,

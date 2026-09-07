@@ -1,5 +1,7 @@
 package com.yonte.feature.settings
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,7 +19,7 @@ import com.yonte.core.update.UpdateInfo
 
 @Composable
 internal fun SettingsUpdates(status: String, info: UpdateInfo?, onCheck: () -> Unit, onDownload: (UpdateInfo) -> Unit, isArabic: Boolean) {
-    Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Button(onClick = onCheck, modifier = Modifier.fillMaxWidth()) { Text(if (isArabic) "التحقق من وجود تحديث" else "Check for updates") }
         if (status.isNotBlank()) Text(status, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         info?.let { update ->

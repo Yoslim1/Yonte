@@ -35,7 +35,7 @@ class ScheduledBackupWorker(
             val database = YonteDatabase.get(applicationContext, key)
             val repository = NoteRepository(database)
             val notes = repository.getAll().map { entity ->
-                BackupNote(entity.id, entity.title, entity.body, entity.isPinned, entity.createdAt, entity.updatedAt)
+                BackupNote(entity.id, entity.title, entity.body, entity.isPinned, entity.createdAt, entity.updatedAt, entity.isArchived, entity.isTrashed)
             }
             val backupCodec = BackupCodec()
             val envelope = buildEncryptedEnvelope(buildNotesPayload(notes)) { backupCodec.encryptWithKey(it, key, salt) }

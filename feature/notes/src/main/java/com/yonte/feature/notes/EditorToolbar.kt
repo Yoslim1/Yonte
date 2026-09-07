@@ -19,7 +19,7 @@ private enum class EditorAction(val arabic: String, val english: String) {
 }
 
 @Composable
-internal fun EditorToolbar(isArabic: Boolean, onAction: (String) -> Unit) {
+internal fun EditorToolbar(isArabic: Boolean, enabled: Boolean = true, onAction: (String) -> Unit) {
     Row(
         modifier = Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -27,6 +27,7 @@ internal fun EditorToolbar(isArabic: Boolean, onAction: (String) -> Unit) {
         EditorAction.entries.forEach { action ->
             FilterChip(
                 selected = false,
+                enabled = enabled,
                 onClick = {
                     val prefix = when (action) {
                         EditorAction.HEADING -> "# "
@@ -45,4 +46,15 @@ internal fun EditorToolbar(isArabic: Boolean, onAction: (String) -> Unit) {
 internal fun appendEditorAction(body: String, prefix: String): String {
     val separator = if (body.isBlank() || body.endsWith("\n")) "" else "\n"
     return body + separator + prefix
+}
+
+/** Apply a block action at the current line, preserving the selected text. */
+internal fun insertEditorAction(value: androidx.compose.ui.text.input.TextFieldValue, prefix: String): androidx.compose.ui.text.input.TextFieldValue {
+    val start = value.selection.min
+    val lineStart = value.text.lastIndexOf('\n', (start - 1).coerceAtLeast(0))
+        .let { if (start == 0) 0 else it + 1 }
+    val text = value.text.substring(0, lineStart) + prefix + value.text.substring(lineStart)
+    return value.copy(text = text, selection = androidx.compose.ui.text.TextRange(
+        value.selection.start + prefix.length, value.selection.end + prefix.length,
+    ), composition = null)
 }

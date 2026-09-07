@@ -2,7 +2,6 @@ package com.yonte.core.backup
 
 import com.yonte.core.security.Argon2Kdf
 import java.nio.ByteBuffer
-import java.security.SecureRandom
 import javax.crypto.Cipher
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
@@ -26,18 +25,25 @@ class BackupCodec {
     }
 
     fun decrypt(payload: ByteArray, passphrase: CharArray): ByteArray {
+        // Validate fixed-width headers before allocating or invoking the expensive KDF.
+        require(payload.size in MIN_PAYLOAD_BYTES..MAX_PAYLOAD_BYTES) { "Invalid backup payload size" }
         val buffer = ByteBuffer.wrap(payload)
-        val saltLen = buffer.int
-        require(saltLen in 0..64) { "Corrupt payload: invalid salt length $saltLen" }
-        val salt = ByteArray(saltLen).also(buffer::get)
-        val ivLen = buffer.int
-        require(ivLen in 0..64) { "Corrupt payload: invalid IV length $ivLen" }
-        val iv = ByteArray(ivLen).also(buffer::get)
-        val ciphertext = ByteArray(buffer.remaining()).also(buffer::get)
+        require(buffer.int == SALT_BYTES) { "Invalid backup salt length" }
+        val salt = ByteArray(SALT_BYTES).also(buffer::get)
+        require(buffer.int == IV_BYTES) { "Invalid backup IV length" }
+        val iv = ByteArray(IV_BYTES).also(buffer::get)
         val key = Argon2Kdf.deriveWithSalt(passphrase, salt)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "AES"), GCMParameterSpec(128, iv))
-        return cipher.doFinal(ciphertext)
+        return cipher.doFinal(payload, buffer.position(), buffer.remaining())
+    }
+
+    private companion object {
+        // Current wire format: Argon2 salt (16), provider AES-GCM nonce (12), tag (16).
+        const val SALT_BYTES = 16
+        const val IV_BYTES = 12
+        const val MIN_PAYLOAD_BYTES = 4 + SALT_BYTES + 4 + IV_BYTES + 16
+        const val MAX_PAYLOAD_BYTES = MAX_BACKUP_FILE_BYTES
     }
 
     /** Encrypt with a pre-derived key and explicit salt. Produces the same wire

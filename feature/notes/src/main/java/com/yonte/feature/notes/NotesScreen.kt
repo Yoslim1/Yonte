@@ -22,27 +22,20 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import java.util.Locale
-import java.util.UUID
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.yonte.core.database.NoteEntity
 import com.yonte.core.database.NoteRepository
 
 @Composable
@@ -51,42 +44,47 @@ fun NotesRoute(
     sharedText: String? = null,
     onSharedTextConsumed: () -> Unit = {},
     onOpenSettings: () -> Unit = {},
+    onEditingChanged: (Boolean) -> Unit = {},
 ) {
     val vm: NotesViewModel = hiltViewModel()
     val notes by vm.notes.collectAsStateWithLifecycle()
-    var editorNote by remember { mutableStateOf<NoteEntity?>(null) }
-    var editorInitialText by remember { mutableStateOf<String?>(null) }
+    val editor by vm.editor.collectAsStateWithLifecycle()
+    LaunchedEffect(editor != null) { onEditingChanged(editor != null) }
     LaunchedEffect(sharedText) {
         if (!sharedText.isNullOrBlank()) {
-            editorNote = null
-            editorInitialText = sharedText
+            vm.openEditor(text = sharedText)
             onSharedTextConsumed()
         }
     }
 
-    val isArabicDevice = Locale.getDefault().language == "ar"
-    CompositionLocalProvider(LocalLayoutDirection provides if (isArabicDevice) LayoutDirection.Rtl else LayoutDirection.Ltr) {
-        if (editorNote != null || editorInitialText != null) {
+    val collection by vm.collection.collectAsStateWithLifecycle()
+    val saveFailed by vm.saveFailed.collectAsStateWithLifecycle()
+    run {
+        if (editor != null) {
         NoteEditor(
-            note = editorNote,
-            initialText = editorInitialText,
+            session = requireNotNull(editor),
+            onDraftChanged = vm::updateEditor,
+            saveFailed = saveFailed,
             onLeave = { id, title, body ->
-                vm.saveImmediately(id, title, body)
-                editorNote = null
-                editorInitialText = null
+                vm.saveImmediately(id, title, body, onComplete = {
+                    vm.closeEditor(id)
+                })
             },
-            onAutoSave = { id, title, body, onSaved -> vm.autosave(id, title, body, onSaved) },
+            onAutoSave = { id, title, body, onSaved -> vm.autosave(id, title, body, onComplete = onSaved) },
         )
     } else {
             NotesHomeScreen(
                 notes = notes,
             onSearch = vm::search,
-            onNew = { initialText -> editorNote = null; editorInitialText = initialText },
-            onEdit = { editorNote = it },
+            onNew = { initialText -> vm.openEditor(text = initialText) },
+            onEdit = { vm.openEditor(note = it) },
             onPin = vm::togglePinned,
             onArchive = vm::archive,
             onTrash = vm::trash,
-                onSettings = onOpenSettings,
+                onOpenSettings = onOpenSettings,
+                collection = collection,
+                onCollectionChange = vm::selectCollection,
+                onRestore = vm::restore,
             )
         }
     }
@@ -95,39 +93,43 @@ fun NotesRoute(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NoteEditor(
-    note: NoteEntity?,
-    initialText: String?,
+    session: EditorSession,
+    onDraftChanged: (String, String) -> Unit,
+    saveFailed: Boolean,
     onLeave: (String?, String, String) -> Unit,
-    onAutoSave: (String?, String, String, (NoteEntity) -> Unit) -> Unit,
+    onAutoSave: (String?, String, String, () -> Unit) -> Unit,
 ) {
     val isArabic = LocalLayoutDirection.current == LayoutDirection.Rtl
     val labels = remember(isArabic) { Labels.arabic.takeIf { isArabic } ?: Labels.english }
-    var draftId by remember(note?.id, initialText) { mutableStateOf(note?.id ?: UUID.randomUUID().toString()) }
-    var title by remember(note?.id, initialText) { mutableStateOf(note?.title.orEmpty()) }
-    var body by remember(note?.id, initialText) { mutableStateOf(note?.body ?: initialText.orEmpty()) }
-    var isSaved by rememberSaveable(note?.id, initialText) { mutableStateOf(true) }
-    val latestDraftId by rememberUpdatedState(draftId)
-    val latestTitle by rememberUpdatedState(title)
-    val latestBody by rememberUpdatedState(body)
-    var hasLeft by remember(note?.id, initialText) { mutableStateOf(false) }
-    val latestHasLeft by rememberUpdatedState(hasLeft)
+    val note = session.note
+    val draftId = session.id
+    var title by remember(session.id) { mutableStateOf(session.title) }
+    var body by remember(session.id) { mutableStateOf(TextFieldValue(session.body)) }
+    var isSaved by remember(session.id) { mutableStateOf(note != null || session.body.isBlank()) }
+    var hasLeft by remember(session.id) { mutableStateOf(false) }
+    LaunchedEffect(saveFailed) { if (saveFailed) hasLeft = false }
 
+    var revision by remember { mutableStateOf(0) }
     fun saveDraft() {
+        if (hasLeft) return
+        onDraftChanged(title, body.text)
+        revision += 1
+        val savingRevision = revision
         isSaved = false
-        onAutoSave(draftId, title, body) {
-            draftId = it.id
-            isSaved = true
+        onAutoSave(draftId, title, body.text) {
+            if (savingRevision == revision) isSaved = true
         }
     }
     fun leave() {
         if (!hasLeft) {
             hasLeft = true
-            onLeave(draftId, title, body)
+            onLeave(draftId, title, body.text)
         }
     }
     BackHandler(enabled = true, onBack = ::leave)
-    DisposableEffect(note?.id, initialText) {
-        onDispose { if (!latestHasLeft) onLeave(latestDraftId, latestTitle, latestBody) }
+    LaunchedEffect(session.id) {
+        // Re-acknowledge the in-memory draft after recreation; no plaintext Bundle state.
+        saveDraft()
     }
 
     Scaffold(
@@ -137,11 +139,11 @@ private fun NoteEditor(
                 title = {
                     Column {
                         Text(if (note == null) labels.newNote else labels.editNote, style = MaterialTheme.typography.titleMedium)
-                        Text(if (isSaved) (if (isArabic) "محفوظ محلياً" else "Saved locally") else (if (isArabic) "جارٍ الحفظ…" else "Saving…"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(if (saveFailed) (if (isArabic) "تعذّر الحفظ — حاول مجددًا" else "Save failed — try again") else if (isSaved) (if (isArabic) "محفوظ محلياً" else "Saved locally") else (if (isArabic) "جارٍ الحفظ…" else "Saving…"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
-                navigationIcon = { IconButton(onClick = ::leave) { Icon(Icons.Outlined.Close, contentDescription = labels.cancel) } },
-                actions = { TextButton(onClick = ::leave) { Text(if (isArabic) "تم" else "Done", fontWeight = FontWeight.Bold) } },
+                navigationIcon = { IconButton(onClick = ::leave, enabled = !hasLeft) { Icon(Icons.Outlined.Close, contentDescription = if (isArabic) "العودة إلى الملاحظات" else "Back to notes") } },
+                actions = { TextButton(onClick = ::leave, enabled = !hasLeft) { Text(if (isArabic) "تم" else "Done", fontWeight = FontWeight.Bold) } },
             )
         },
     ) { padding ->
@@ -152,7 +154,8 @@ private fun NoteEditor(
             Text(if (isArabic) "مساحة لبدء فكرة" else "A space to begin an idea", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             BasicTextField(
                 value = title,
-                onValueChange = { title = it; saveDraft() },
+                onValueChange = { if (!hasLeft) { title = it; saveDraft() } },
+                readOnly = hasLeft,
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 textStyle = MaterialTheme.typography.displaySmall.copy(color = MaterialTheme.colorScheme.onBackground),
@@ -162,18 +165,27 @@ private fun NoteEditor(
                     inner()
                 },
             )
-            EditorToolbar(isArabic = isArabic) { prefix ->
-                body = appendEditorAction(body, prefix)
-                saveDraft()
+            EditorToolbar(isArabic = isArabic, enabled = !hasLeft) { prefix ->
+                if (!hasLeft) {
+                    body = insertEditorAction(body, prefix)
+                    saveDraft()
+                }
             }
             BasicTextField(
                 value = body,
-                onValueChange = { body = it; saveDraft() },
+                onValueChange = { value ->
+                    if (!hasLeft) {
+                        val changed = body.text != value.text
+                        body = value
+                        if (changed) saveDraft()
+                    }
+                },
+                readOnly = hasLeft,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 420.dp),
                 textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onBackground),
                 cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                 decorationBox = { inner ->
-                    if (body.isBlank()) Text(labels.writeHere, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
+                    if (body.text.isBlank()) Text(labels.writeHere, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
                     inner()
                 },
             )

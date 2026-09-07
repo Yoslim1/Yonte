@@ -15,14 +15,36 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 @Composable
-internal fun NotesEmptyState(onNew: (String) -> Unit, isArabic: Boolean) {
-    Box(Modifier.fillMaxWidth().padding(vertical = 72.dp), contentAlignment = Alignment.Center) {
+internal fun NotesEmptyState(
+    onNew: (String) -> Unit,
+    isArabic: Boolean,
+    collection: NotesCollection,
+    hasFilters: Boolean,
+    onClearFilters: () -> Unit,
+) {
+    val title = when {
+        hasFilters -> if (isArabic) "لا توجد نتائج" else "No results"
+        collection == NotesCollection.ARCHIVED -> if (isArabic) "الأرشيف فارغ" else "Archive is empty"
+        collection == NotesCollection.TRASHED -> if (isArabic) "المحذوفات فارغة" else "Trash is empty"
+        else -> if (isArabic) "مساحة لفكرتك الأولى" else "Room for your first idea"
+    }
+    val message = when {
+        hasFilters -> if (isArabic) "جرّب كلمات أخرى أو امسح عوامل التصفية" else "Try different words or clear your filters"
+        collection == NotesCollection.ARCHIVED -> if (isArabic) "ستجد ملاحظاتك المؤرشفة هنا ويمكنك استعادتها" else "Archived notes appear here and can be restored"
+        collection == NotesCollection.TRASHED -> if (isArabic) "ستجد الملاحظات المحذوفة هنا ويمكنك استعادتها" else "Deleted notes appear here and can be restored"
+        else -> if (isArabic) "اكتب ما يلهمك، وسيحفظه Yonte تلقائياً" else "Capture what inspires you; Yonte saves as you go"
+    }
+    Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(if (isArabic) "مساحة جديدة" else "A fresh space", style = MaterialTheme.typography.titleLarge)
-            Spacer(Modifier.height(6.dp))
-            Text(if (isArabic) "ابدأ بفكرة صغيرة، وسيحفظها Yonte تلقائياً" else "Start small; Yonte saves as you go", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(title, style = MaterialTheme.typography.titleLarge)
+            Spacer(Modifier.height(8.dp))
+            Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
             Spacer(Modifier.height(12.dp))
-            TextButton(onClick = { onNew("") }) { Text(if (isArabic) "أنشئ أول ملاحظة" else "Create your first note") }
+            if (hasFilters) {
+                TextButton(onClick = onClearFilters) { Text(if (isArabic) "مسح التصفية" else "Clear filters") }
+            } else if (collection == NotesCollection.ACTIVE) {
+                TextButton(onClick = { onNew("") }) { Text(if (isArabic) "أنشئ أول ملاحظة" else "Create your first note") }
+            }
         }
     }
 }

@@ -4,6 +4,8 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -57,17 +59,20 @@ internal fun SettingsData(
         BackupFrequency.OFF to (if (isArabic) "متوقف" else "Off"),
     )
 
-    Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text(if (isArabic) "بياناتك محلية على جهازك" else "Your data stays on this device", color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Button(onClick = onExport, modifier = Modifier.weight(1f)) { Text(if (isArabic) "تصدير" else "Export") }
-            OutlinedButton(onClick = onImport, modifier = Modifier.weight(1f)) { Text(if (isArabic) "استيراد" else "Import") }
+            Button(onClick = onExport, enabled = !uiState.isBackupBusy, modifier = Modifier.weight(1f)) { Text(if (isArabic) "تصدير" else "Export") }
+            OutlinedButton(onClick = onImport, enabled = !uiState.isBackupBusy, modifier = Modifier.weight(1f)) { Text(if (isArabic) "استيراد" else "Import") }
         }
 
+        if (uiState.isBackupBusy) {
+            Text(if (isArabic) "جارٍ معالجة النسخة الاحتياطية…" else "Processing backup…", style = MaterialTheme.typography.bodySmall)
+        }
         Spacer(Modifier.height(8.dp))
         Text(if (isArabic) "النسخ الاحتياطي التلقائي" else "Automatic backup", style = MaterialTheme.typography.titleMedium)
         Text(
-            if (isArabic) "نسخ احتياطي دوري للStored notes في مجلد تختاره" else "Periodically back up your notes to a folder you choose",
+            if (isArabic) "نسخ احتياطي دوري لملاحظاتك في مجلد تختاره" else "Periodically back up your notes to a folder you choose",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
