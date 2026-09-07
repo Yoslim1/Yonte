@@ -16,6 +16,9 @@ import com.yonte.core.database.NoteRepository
 import com.yonte.core.security.LocalKeyManager
 import com.yonte.core.update.UpdateGateway
 import com.yonte.core.update.UpdateInfo
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -29,6 +32,7 @@ internal class SettingsViewModel(
     private val localKeyManager: LocalKeyManager,
     private val currentVersionCode: Int,
     private val appContext: Context,
+    private val backupDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val scheduleAutoBackup: (Context, BackupFrequency) -> Unit = { context, frequency ->
         AutoBackupScheduler.schedule(context, frequency)
     },
@@ -50,51 +54,69 @@ internal class SettingsViewModel(
     }
 
     fun export(contentResolver: ContentResolver, uri: Uri, isArabic: Boolean, onResult: (Boolean) -> Unit) {
-        val sessionKey = localKeyManager.cachedSessionKey()
-        val localSalt = localKeyManager.currentSalt()
+        if (_uiState.value.isBackupBusy) return
+        // Own the key copy so a lock cannot erase bytes during an active export.
+        val sessionKey = localKeyManager.cachedSessionKey()?.copyOf()
+        val localSalt = localKeyManager.currentSalt()?.copyOf()
         if (sessionKey == null || localSalt == null) {
+            sessionKey?.fill(0)
             onResult(false)
             return
         }
-        viewModelScope.launch {
-            try {
-                runCatching {
+        _uiState.value = _uiState.value.copy(isBackupBusy = true)
+        viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            val success = try {
+                withContext(backupDispatcher) {
                     PassphraseBackupFlow.exportWithKey(
                         backupGateway,
                         contentResolver,
                         uri,
                         repository.getAll().map { note ->
-                            BackupNote(note.id, note.title, note.body, note.isPinned, note.createdAt, note.updatedAt)
+                            BackupNote(note.id, note.title, note.body, note.isPinned, note.createdAt, note.updatedAt, note.isArchived, note.isTrashed)
                         },
                         sessionKey,
                         localSalt,
                     )
-                }.onSuccess { onResult(true) }
-                    .onFailure { onResult(false) }
+                }
+                true
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                false
             } finally {
                 sessionKey.fill(0)
                 localSalt.fill(0)
+                _uiState.value = _uiState.value.copy(isBackupBusy = false)
             }
+            onResult(success)
         }
     }
 
     fun import(contentResolver: ContentResolver, uri: Uri, passphrase: CharArray, isArabic: Boolean, onResult: (Boolean) -> Unit) {
-        viewModelScope.launch {
-            try {
-                runCatching {
-                    PassphraseBackupFlow.import(backupGateway, contentResolver, uri, passphrase).map { item ->
-                        NoteEntity(item.id, item.title, item.body, ArabicNormalizer.normalize("${item.title} ${item.body}"), item.isPinned, false, false, item.createdAt, item.updatedAt)
+        if (_uiState.value.isBackupBusy) {
+            passphrase.fill('\u0000')
+            return
+        }
+        _uiState.value = _uiState.value.copy(isBackupBusy = true)
+        // Start immediately so cancellation always reaches passphrase cleanup.
+        viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            val success = try {
+                withContext(backupDispatcher) {
+                    val restored = PassphraseBackupFlow.import(backupGateway, contentResolver, uri, passphrase).map { item ->
+                        NoteEntity(item.id, item.title, item.body, ArabicNormalizer.normalize("${item.title} ${item.body}"), item.isPinned, item.isArchived, item.isTrashed, item.createdAt, item.updatedAt)
                     }
-                }.onSuccess { restored ->
                     repository.restore(restored)
-                    onResult(true)
-                }.onFailure { e ->
-                    android.util.Log.e("YonteBackupImport", "Import failed", e)
-                    onResult(false)
                 }
+                true
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                false
             } finally {
                 passphrase.fill('\u0000')
+                _uiState.value = _uiState.value.copy(isBackupBusy = false)
             }
+            onResult(success)
         }
     }
 

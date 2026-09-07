@@ -1,6 +1,8 @@
 package com.yonte.feature.notes
 
-import android.text.format.DateUtils
+import java.text.DateFormat
+import java.util.Date
+import java.util.Locale
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -39,11 +41,16 @@ internal fun NoteCard(
     onPin: (NoteEntity) -> Unit,
     onArchive: (NoteEntity) -> Unit,
     onTrash: (NoteEntity) -> Unit,
+    onRestore: (NoteEntity) -> Unit,
 ) {
     val preview = notePreview(note.title, note.body)
+    val updatedLabel = remember(note.updatedAt, isArabic) {
+        DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT, Locale(if (isArabic) "ar" else "en"))
+            .format(Date(note.updatedAt))
+    }
     var menuExpanded by remember { mutableStateOf(false) }
     Card(
-        onClick = { onEdit(note) },
+        onClick = { if (!note.isTrashed) onEdit(note) },
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(
@@ -56,13 +63,23 @@ internal fun NoteCard(
                 Text(preview.title.ifBlank { if (isArabic) "بدون عنوان" else "Untitled" }, modifier = Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (note.isPinned) Icon(Icons.Outlined.PushPin, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(17.dp))
                 Box {
-                    IconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(34.dp)) {
+                    IconButton(onClick = { menuExpanded = true }, modifier = Modifier.size(48.dp)) {
                         Icon(Icons.Outlined.MoreVert, contentDescription = if (isArabic) "المزيد" else "More", modifier = Modifier.size(18.dp))
                     }
                     DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                        DropdownMenuItem(text = { Text(if (note.isPinned) (if (isArabic) "إلغاء التثبيت" else "Unpin") else (if (isArabic) "تثبيت" else "Pin")) }, onClick = { menuExpanded = false; onPin(note) })
-                        DropdownMenuItem(text = { Text(if (isArabic) "أرشفة" else "Archive") }, onClick = { menuExpanded = false; onArchive(note) })
-                        DropdownMenuItem(text = { Text(if (isArabic) "حذف" else "Delete") }, onClick = { menuExpanded = false; onTrash(note) })
+                        if (note.isTrashed) {
+                            DropdownMenuItem(
+                                text = { Text(if (isArabic) (if (note.isArchived) "استعادة إلى الأرشيف" else "استعادة الملاحظة") else (if (note.isArchived) "Restore to archive" else "Restore note")) },
+                                onClick = { menuExpanded = false; onRestore(note) },
+                            )
+                        } else {
+                            DropdownMenuItem(text = { Text(if (note.isPinned) (if (isArabic) "إلغاء التثبيت" else "Unpin") else (if (isArabic) "تثبيت" else "Pin")) }, onClick = { menuExpanded = false; onPin(note) })
+                            DropdownMenuItem(
+                                text = { Text(if (note.isArchived) (if (isArabic) "إلغاء الأرشفة" else "Unarchive") else (if (isArabic) "أرشفة" else "Archive")) },
+                                onClick = { menuExpanded = false; if (note.isArchived) onRestore(note) else onArchive(note) },
+                            )
+                            DropdownMenuItem(text = { Text(if (isArabic) "نقل إلى المحذوفات" else "Move to trash") }, onClick = { menuExpanded = false; onTrash(note) })
+                        }
                     }
                 }
             }
@@ -74,7 +91,7 @@ internal fun NoteCard(
             }
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(DateUtils.getRelativeTimeSpanString(note.updatedAt, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                Text(updatedLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
             }
         }
     }

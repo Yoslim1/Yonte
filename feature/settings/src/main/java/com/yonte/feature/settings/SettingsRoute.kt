@@ -13,7 +13,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -34,12 +36,18 @@ fun SettingsRoute(
     currentVersionCode: Int,
     onClose: () -> Unit,
     localKeyManager: LocalKeyManager,
+    isVisible: Boolean = true,
+    languageCode: String? = null,
+    onLanguageChanged: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
-    val viewModel = remember {
+    val store = remember(repository, backupGateway, updateGateway, localKeyManager, currentVersionCode) { ViewModelStore() }
+    val viewModel = remember(store) {
         SettingsViewModel(repository, backupGateway, updateGateway, localKeyManager, currentVersionCode, context.applicationContext)
+            .also { store.put("settings", it) }
     }
-    val uiState by viewModel.uiState.collectAsState()
+    DisposableEffect(store) { onDispose { store.clear() } }
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isArabic = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
 
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
@@ -57,11 +65,10 @@ fun SettingsRoute(
 
     val title = when (uiState.section) {
         null -> if (isArabic) "الإعدادات" else "Settings"
-        SettingsSection.APPEARANCE -> if (isArabic) "المظهر" else "Appearance"
         SettingsSection.DATA -> if (isArabic) "البيانات والنسخ الاحتياطي" else "Data & backup"
         SettingsSection.UPDATES -> if (isArabic) "التحديثات" else "Updates"
     }
-    BackHandler(enabled = uiState.section != null) { viewModel.openSection(null) }
+    BackHandler(enabled = isVisible && uiState.section != null) { viewModel.openSection(null) }
 
     Scaffold(
         topBar = {
@@ -72,13 +79,25 @@ fun SettingsRoute(
                         Text(if (uiState.section == null) (if (isArabic) "إغلاق" else "Close") else (if (isArabic) "رجوع" else "Back"))
                     }
                 },
+                actions = {
+                    if (uiState.section != null) {
+                        TextButton(onClick = onClose) { Text(if (isArabic) "إغلاق" else "Close") }
+                    }
+                },
             )
         },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             when (uiState.section) {
-                null -> SettingsMenu(isArabic, { viewModel.openSection(SettingsSection.APPEARANCE) }, { viewModel.openSection(SettingsSection.DATA) }, { viewModel.openSection(SettingsSection.UPDATES) })
-                SettingsSection.APPEARANCE -> SettingsAppearance(darkTheme, onThemeChanged, isArabic)
+                null -> SettingsMenu(
+                    isArabic = isArabic,
+                    darkTheme = darkTheme,
+                    onThemeChanged = onThemeChanged,
+                    languageCode = languageCode,
+                    onLanguageChanged = onLanguageChanged,
+                    onData = { viewModel.openSection(SettingsSection.DATA) },
+                    onUpdates = { viewModel.openSection(SettingsSection.UPDATES) },
+                )
                 SettingsSection.DATA -> SettingsData(
                     uiState = uiState,
                     onExport = { exportLauncher.launch("yonte-backup.ynt") },

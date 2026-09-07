@@ -23,6 +23,8 @@ object ArabicNormalizer {
 class NoteRepository(private val database: YonteDatabase) {
     private val dao = database.noteDao()
 
+    fun observeAll(): Flow<List<NoteEntity>> = dao.observeAll()
+
     fun observeActive(): Flow<List<NoteEntity>> = dao.observeActive()
 
     suspend fun get(id: String): NoteEntity? = dao.getById(id)
@@ -30,7 +32,10 @@ class NoteRepository(private val database: YonteDatabase) {
     suspend fun getAll(): List<NoteEntity> = dao.getAll()
 
     suspend fun restore(notes: List<NoteEntity>) {
-        database.withTransaction { dao.upsertAll(notes) }
+        database.withTransaction {
+            dao.upsertAll(notes)
+            notes.forEach(::updateFts)
+        }
     }
 
     suspend fun save(id: String?, title: String, body: String): NoteEntity {
@@ -47,8 +52,10 @@ class NoteRepository(private val database: YonteDatabase) {
             createdAt = existing?.createdAt ?: now,
             updatedAt = now,
         )
-        dao.upsert(note)
-        updateFts(note)
+        database.withTransaction {
+            dao.upsert(note)
+            updateFts(note)
+        }
         return note
     }
 

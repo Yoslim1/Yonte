@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — Arabic-first mineral identity and settings drawer (2026-09-07)
+
+- `app/.../MainActivity.kt`, `core/designsystem/.../YonteTheme.kt`, `YonteMark.kt`: introduce mineral dark/light colors and a geometric papyrus mark, persist Arabic/English and theme choice, and replace settings navigation with a direction-aware, settings-only sliding drawer.
+- `feature/notes/...`: expose active/archive/trash collections and recovery, reactive normalized search, full-width grid headings, cursor-aware formatting, in-memory editor sessions and completed/error autosave states.
+- `core/database/.../NoteDao.kt`, `NoteRepository.kt`: observe all collections, preserve stable draft IDs, and update FTS during save/restore transactions without a schema change.
+- `feature/settings/...`: lifecycle-owned settings work, IO backup processing, busy guards, secret cleanup, and a matching-ID overwrite warning.
+- `core/backup/.../BackupCodec.kt`, `BackupService.kt`, `ScheduledBackupWorker.kt`: reject malformed headers and oversized files, enforce the same 16 MiB encoded-file limit on export/import, and retain archive/trash flags through optional backward-compatible JSON fields. Encryption framing and derivation parameters are unchanged.
+- Focused regressions added for editor insertion, collections/search, malformed backup input, bounded reads, and legacy backup payload compatibility. Local Gradle execution was blocked by unavailable network while downloading the wrapper distribution; no CI or APK claim. Commit: this commit.
+
 ## Unreleased — Memory hygiene, payload validation, permanent-failure handling (2026-09-06)
 
 - `feature/settings/.../SettingsViewModel.kt`: zero `sessionKey` and `localSalt`
