@@ -25,12 +25,17 @@ class NoteRepository(private val database: YonteDatabase) {
 
     fun observeActive(): Flow<List<NoteEntity>> = dao.observeActive()
 
+    fun observeAll(): Flow<List<NoteEntity>> = dao.observeAll()
+
     suspend fun get(id: String): NoteEntity? = dao.getById(id)
 
     suspend fun getAll(): List<NoteEntity> = dao.getAll()
 
     suspend fun restore(notes: List<NoteEntity>) {
-        database.withTransaction { dao.upsertAll(notes) }
+        database.withTransaction {
+            dao.upsertAll(notes)
+            notes.forEach(::updateFts)
+        }
     }
 
     suspend fun save(id: String?, title: String, body: String): NoteEntity {
@@ -47,21 +52,32 @@ class NoteRepository(private val database: YonteDatabase) {
             createdAt = existing?.createdAt ?: now,
             updatedAt = now,
         )
-        dao.upsert(note)
-        updateFts(note)
+        database.withTransaction {
+            dao.upsert(note)
+            updateFts(note)
+        }
         return note
     }
 
     suspend fun setPinned(id: String, pinned: Boolean) {
-        dao.setPinned(id, pinned, System.currentTimeMillis())
+        database.withTransaction {
+            dao.setPinned(id, pinned, System.currentTimeMillis())
+            dao.getById(id)?.let(::updateFts)
+        }
     }
 
     suspend fun setArchived(id: String, archived: Boolean) {
-        dao.setArchived(id, archived, System.currentTimeMillis())
+        database.withTransaction {
+            dao.setArchived(id, archived, System.currentTimeMillis())
+            dao.getById(id)?.let(::updateFts)
+        }
     }
 
     suspend fun setTrashed(id: String, trashed: Boolean) {
-        dao.setTrashed(id, trashed, System.currentTimeMillis())
+        database.withTransaction {
+            dao.setTrashed(id, trashed, System.currentTimeMillis())
+            dao.getById(id)?.let(::updateFts)
+        }
     }
 
     suspend fun search(query: String): List<NoteEntity> {
