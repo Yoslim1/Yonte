@@ -192,6 +192,23 @@ internal class SettingsViewModel(
         tree.listFiles().sumOf { it.length() }
     }
 
+    fun currentUnlockMethod(): String = localKeyManager.unlockMethod()
+
+    fun requestUnlockMethodChange(newMethod: String) {
+        localKeyManager.setUnlockMethod(newMethod)
+        when (newMethod) {
+            LocalKeyManager.METHOD_PASSPHRASE -> {
+                localKeyManager.clearPinUnlockKey()
+            }
+            LocalKeyManager.METHOD_PIN -> {
+                // PIN setup will be triggered by the UI
+            }
+            LocalKeyManager.METHOD_BIOMETRIC -> {
+                // Biometric setup will be triggered by the UI
+            }
+        }
+    }
+
     private companion object {
         const val KEY_FREQUENCY = "auto_backup_frequency"
     }

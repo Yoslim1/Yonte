@@ -4,7 +4,7 @@ import android.net.Uri
 import com.yonte.core.backup.BackupFrequency
 import com.yonte.core.update.UpdateInfo
 
-internal enum class SettingsSection { APPEARANCE, DATA, UPDATES }
+internal enum class SettingsSection { APPEARANCE, SECURITY, DATA, UPDATES }
 
 internal data class SettingsUiState(
     val section: SettingsSection? = null,

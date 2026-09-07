@@ -58,6 +58,7 @@ fun SettingsRoute(
     val title = when (uiState.section) {
         null -> if (isArabic) "الإعدادات" else "Settings"
         SettingsSection.APPEARANCE -> if (isArabic) "المظهر" else "Appearance"
+        SettingsSection.SECURITY -> if (isArabic) "الأمان" else "Security"
         SettingsSection.DATA -> if (isArabic) "البيانات والنسخ الاحتياطي" else "Data & backup"
         SettingsSection.UPDATES -> if (isArabic) "التحديثات" else "Updates"
     }
@@ -77,8 +78,20 @@ fun SettingsRoute(
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             when (uiState.section) {
-                null -> SettingsMenu(isArabic, { viewModel.openSection(SettingsSection.APPEARANCE) }, { viewModel.openSection(SettingsSection.DATA) }, { viewModel.openSection(SettingsSection.UPDATES) })
+                null -> SettingsMenu(
+                    isArabic,
+                    onAppearance = { viewModel.openSection(SettingsSection.APPEARANCE) },
+                    onSecurity = { viewModel.openSection(SettingsSection.SECURITY) },
+                    onData = { viewModel.openSection(SettingsSection.DATA) },
+                    onUpdates = { viewModel.openSection(SettingsSection.UPDATES) },
+                )
                 SettingsSection.APPEARANCE -> SettingsAppearance(darkTheme, onThemeChanged, isArabic)
+                SettingsSection.SECURITY -> SettingsSecurity(
+                    currentMethod = viewModel.currentUnlockMethod(),
+                    isArabic = isArabic,
+                    onChangeMethod = { method -> viewModel.requestUnlockMethodChange(method) },
+                    onBack = { viewModel.openSection(null) },
+                )
                 SettingsSection.DATA -> SettingsData(
                     uiState = uiState,
                     onExport = { exportLauncher.launch("yonte-backup.ynt") },
