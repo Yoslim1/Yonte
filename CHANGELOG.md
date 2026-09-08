@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased — TASK 25: Fix PIN main-thread freeze, biometric unlock stuck state, secure storage hardening (2026-09-08)
+
+- `app/.../MainViewModel.kt`: `submitPin()` now runs Argon2id KDF on `Dispatchers.Default`
+  instead of the main thread, eliminating a 1-2 second UI freeze on every PIN entry.
+  Added busy-guard with PIN zeroing to prevent re-entrant submission.
+- `app/.../MainActivity.kt`: biometric unlock method preference is only persisted after
+  `BiometricPrompt` setup cipher round-trip succeeds; added null-cache recovery path
+  for missing `cache_iv`/`cache_data` so users cannot get stuck in a dead-end state.
+- `core/security/.../BiometricUnlockManager.kt` (new): extracted biometric key-wrap/unwrap
+  logic from `MainActivity` into a reusable class with `BiometricCipherProvider` interface
+  for testability; `MainActivity` no longer touches biometric SharedPreferences directly.
+- `core/security/.../BiometricUnlockManagerTest.kt` (new): unit tests covering storage
+  round-trip, missing-key handling, and key clearing via a fake JVM cipher provider.
+- `feature/settings/.../SettingsRoute.kt`: choosing "Biometric" or "PIN" in Settings now
+  triggers real setup (BiometricPrompt or PIN-creation screen) before the preference changes.
+- `core/security/.../AppPinManager.kt`: PIN hash comparison uses constant-time
+  `MessageDigest.isEqual` instead of `contentEquals`.
+- `ROADMAP.md`: added deferred "plain SharedPreferences, values independently encrypted,
+  migrate to DataStore+Tink if justified" item.
+
 ## Unreleased — TASK 24: Settings UI for unlock method configuration (2026-09-07)
 
 - Added Security section to Settings allowing users to view and change their unlock
