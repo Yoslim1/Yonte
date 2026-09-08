@@ -53,6 +53,19 @@ internal fun insertEditorAction(value: androidx.compose.ui.text.input.TextFieldV
     val start = value.selection.min
     val lineStart = value.text.lastIndexOf('\n', (start - 1).coerceAtLeast(0))
         .let { if (start == 0) 0 else it + 1 }
+    if (prefix == "- [ ] " && editorBlocks(value.text).any { it.start == lineStart && it.checkOffset != null }) {
+        val lineEnd = value.text.indexOf('\n', lineStart).let { if (it < 0) value.text.length else it }
+        val contentEnd = if (lineEnd > lineStart && value.text[lineEnd - 1] == '\r') lineEnd - 1 else lineEnd
+        val separator = if (contentEnd < lineEnd ||
+            (lineEnd == value.text.length && value.text.contains("\r\n"))
+        ) "\r\n" else "\n"
+        val inserted = separator + prefix
+        return value.copy(
+            text = value.text.substring(0, contentEnd) + inserted + value.text.substring(contentEnd),
+            selection = androidx.compose.ui.text.TextRange(contentEnd + inserted.length),
+            composition = null,
+        )
+    }
     val text = value.text.substring(0, lineStart) + prefix + value.text.substring(lineStart)
     return value.copy(text = text, selection = androidx.compose.ui.text.TextRange(
         value.selection.start + prefix.length, value.selection.end + prefix.length,

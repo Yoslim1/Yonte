@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — Interactive tasks and dimensional note surfaces (2026-09-08)
+
+- `feature/notes/.../TaskBodyEditor.kt`, `EditorTasks.kt`, `EditorToolbar.kt`, `NotesScreen.kt`: render Markdown tasks as editable native checkboxes with completion progress, Arabic/English labels, list continuation, and a full-text editing option. Existing Markdown storage, autosave, encryption, and schema are preserved.
+- `feature/notes/.../NoteCard.kt`, `NotesHomeScreen.kt`, `QuickAddChoice.kt`: add restrained surface depth, highlights, press feedback, and animated collection items within the existing mineral/gold identity.
+- `feature/notes/.../EditorTasksTest.kt`: add regression coverage for mixed Arabic text, fenced code, CRLF preservation, toggling, selection, task continuation and exiting empty tasks. Commit: this commit.
+
 ## Unreleased — Arabic-first mineral identity and settings drawer (2026-09-07)
 
 - `app/.../MainActivity.kt`, `core/designsystem/.../YonteTheme.kt`, `YonteMark.kt`: introduce mineral dark/light colors and a geometric papyrus mark, persist Arabic/English and theme choice, and replace settings navigation with a direction-aware, settings-only sliding drawer.

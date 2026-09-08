@@ -1,6 +1,9 @@
 package com.yonte.feature.notes
 
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.material3.FilterChip
@@ -29,6 +32,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -104,7 +108,14 @@ fun NotesHomeScreen(
                         Icon(Icons.Outlined.Menu, contentDescription = if (isArabic) "فتح الإعدادات" else "Open settings")
                     }
                     Text("Yonte", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-                    YonteMark()
+                    Surface(
+                        shape = MaterialTheme.shapes.medium,
+                        color = MaterialTheme.colorScheme.surface,
+                        shadowElevation = 5.dp,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
+                    ) {
+                        Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) { YonteMark() }
+                    }
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(pageTitle, style = MaterialTheme.typography.headlineMedium)
@@ -144,11 +155,11 @@ fun NotesHomeScreen(
                 if (pinned.isNotEmpty()) item(key = "pinned-header", span = { GridItemSpan(maxLineSpan) }) {
                     NotesSectionHeader(if (isArabic) "المثبتة" else "Pinned", true)
                 }
-                items(pinned, key = { "p-${it.id}" }) { note -> NoteCard(note, isArabic, onEdit, onPin, onArchive, onTrash, onRestore) }
+                items(pinned, key = { "p-${it.id}" }) { note -> NoteCard(note, isArabic, onEdit, onPin, onArchive, onTrash, onRestore, Modifier.animateItem()) }
                 if (recent.isNotEmpty()) item(key = "recent-header", span = { GridItemSpan(maxLineSpan) }) {
                     NotesSectionHeader(if (isArabic) "الأحدث" else "Recent", true)
                 }
-                items(recent, key = { "r-${it.id}" }) { note -> NoteCard(note, isArabic, onEdit, onPin, onArchive, onTrash, onRestore) }
+                items(recent, key = { "r-${it.id}" }) { note -> NoteCard(note, isArabic, onEdit, onPin, onArchive, onTrash, onRestore, Modifier.animateItem()) }
             }
         }
     }

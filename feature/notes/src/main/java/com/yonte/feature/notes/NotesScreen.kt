@@ -3,7 +3,6 @@ package com.yonte.feature.notes
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -107,6 +106,7 @@ private fun NoteEditor(
     var body by remember(session.id) { mutableStateOf(TextFieldValue(session.body)) }
     var isSaved by remember(session.id) { mutableStateOf(note != null || session.body.isBlank()) }
     var hasLeft by remember(session.id) { mutableStateOf(false) }
+    var bodyFocusRequest by remember(session.id) { mutableStateOf(0) }
     LaunchedEffect(saveFailed) { if (saveFailed) hasLeft = false }
 
     var revision by remember { mutableStateOf(0) }
@@ -168,10 +168,11 @@ private fun NoteEditor(
             EditorToolbar(isArabic = isArabic, enabled = !hasLeft) { prefix ->
                 if (!hasLeft) {
                     body = insertEditorAction(body, prefix)
+                    bodyFocusRequest += 1
                     saveDraft()
                 }
             }
-            BasicTextField(
+            TaskBodyEditor(
                 value = body,
                 onValueChange = { value ->
                     if (!hasLeft) {
@@ -181,13 +182,9 @@ private fun NoteEditor(
                     }
                 },
                 readOnly = hasLeft,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 420.dp),
-                textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onBackground),
-                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                decorationBox = { inner ->
-                    if (body.text.isBlank()) Text(labels.writeHere, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
-                    inner()
-                },
+                isArabic = isArabic,
+                placeholder = labels.writeHere,
+                focusRequest = bodyFocusRequest,
             )
             Text(labels.autosaveHint, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
