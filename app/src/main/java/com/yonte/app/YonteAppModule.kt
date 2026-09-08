@@ -5,10 +5,11 @@ import com.yonte.core.backup.BackupGateway
 import com.yonte.core.backup.BackupService
 import com.yonte.core.database.NoteRepository
 import com.yonte.core.database.YonteDatabase
-import com.yonte.core.security.EncryptionManager
-import com.yonte.core.security.LocalKeyManager
 import com.yonte.core.security.AppPinManager
 import com.yonte.core.security.BiometricGateCipher
+import com.yonte.core.security.BiometricUnlockManager
+import com.yonte.core.security.EncryptionManager
+import com.yonte.core.security.LocalKeyManager
 import com.yonte.core.update.UpdateGateway
 import com.yonte.core.update.UpdateService
 import dagger.Module
@@ -41,6 +42,13 @@ object YonteAppModule {
     @Provides
     @Singleton
     fun provideBiometricGateCipher(): BiometricGateCipher = BiometricGateCipher()
+
+    @Provides
+    @Singleton
+    fun provideBiometricUnlockManager(
+        @ApplicationContext context: Context,
+        biometricGateCipher: BiometricGateCipher,
+    ): BiometricUnlockManager = BiometricUnlockManager(context, biometricGateCipher)
 
     @Provides
     @Singleton

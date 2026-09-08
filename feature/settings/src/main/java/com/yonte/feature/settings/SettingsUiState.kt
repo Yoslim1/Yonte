@@ -16,4 +16,5 @@ internal data class SettingsUiState(
     val showImportPassphraseDialog: Boolean = false,
     val pendingImportUri: Uri? = null,
     val isBackupBusy: Boolean = false,
+    val unlockMethod: String = "PASSPHRASE",
 )

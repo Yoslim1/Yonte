@@ -43,12 +43,16 @@ internal class SettingsViewModel(
             frequency = runCatching {
                 BackupFrequency.valueOf(prefs.getString(KEY_FREQUENCY, BackupFrequency.OFF.name)!!)
             }.getOrDefault(BackupFrequency.OFF),
+            unlockMethod = localKeyManager.unlockMethod(),
         ),
     )
     val uiState: StateFlow<SettingsUiState> = _uiState
 
     fun openSection(section: SettingsSection?) {
         _uiState.value = _uiState.value.copy(section = section)
+        if (section == SettingsSection.SECURITY) {
+            _uiState.value = _uiState.value.copy(unlockMethod = localKeyManager.unlockMethod())
+        }
     }
 
     fun export(contentResolver: ContentResolver, uri: Uri, isArabic: Boolean, onResult: (Boolean) -> Unit) {
@@ -192,21 +196,26 @@ internal class SettingsViewModel(
         tree.listFiles().sumOf { it.length() }
     }
 
-    fun currentUnlockMethod(): String = localKeyManager.unlockMethod()
-
     fun requestUnlockMethodChange(newMethod: String) {
-        localKeyManager.setUnlockMethod(newMethod)
         when (newMethod) {
             LocalKeyManager.METHOD_PASSPHRASE -> {
+                localKeyManager.setUnlockMethod(newMethod)
                 localKeyManager.clearPinUnlockKey()
+                _uiState.value = _uiState.value.copy(unlockMethod = newMethod)
             }
             LocalKeyManager.METHOD_PIN -> {
-                // PIN setup will be triggered by the UI
+                // PIN setup must complete before changing the method.
+                // The caller (MainActivity) triggers PIN creation and sets the method on success.
             }
             LocalKeyManager.METHOD_BIOMETRIC -> {
-                // Biometric setup will be triggered by the UI
+                // Biometric setup must complete before changing the method.
+                // The caller (MainActivity) triggers BiometricPrompt and sets the method on success.
             }
         }
+    }
+
+    fun updateUnlockMethod(method: String) {
+        _uiState.value = _uiState.value.copy(unlockMethod = method)
     }
 
     private companion object {

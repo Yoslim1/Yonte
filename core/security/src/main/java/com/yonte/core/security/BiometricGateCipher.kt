@@ -7,11 +7,21 @@ import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 
+/** Abstraction over cipher creation for biometric key-wrap operations.
+ * Production implementation is backed by [BiometricGateCipher] (AndroidKeyStore);
+ * tests can supply a JVM-only fake. */
+interface BiometricCipherProvider {
+    fun encryptCipher(): Cipher
+    fun decryptCipher(iv: ByteArray): Cipher
+}
+
 /** Cipher whose key requires a fresh biometric authentication for every use. Used
  * only to gate the session-key cache behind BiometricPrompt; distinct from
  * EncryptionManager's key (which stays non-auth-gated so the PIN path — where our own
  * UI is the presence check — can unwrap the cache without a second system prompt). */
-class BiometricGateCipher(private val alias: String = "yonte_biometric_gate_key") {
+class BiometricGateCipher(
+    private val alias: String = "yonte_biometric_gate_key",
+) : BiometricCipherProvider {
     private val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
 
     fun getOrCreateKey(): SecretKey {
@@ -30,11 +40,11 @@ class BiometricGateCipher(private val alias: String = "yonte_biometric_gate_key"
         return generator.generateKey()
     }
 
-    fun decryptCipher(iv: ByteArray): Cipher =
+    override fun decryptCipher(iv: ByteArray): Cipher =
         Cipher.getInstance("AES/GCM/NoPadding").apply {
             init(Cipher.DECRYPT_MODE, getOrCreateKey(), javax.crypto.spec.GCMParameterSpec(128, iv))
         }
 
-    fun encryptCipher(): Cipher =
+    override fun encryptCipher(): Cipher =
         Cipher.getInstance("AES/GCM/NoPadding").apply { init(Cipher.ENCRYPT_MODE, getOrCreateKey()) }
 }

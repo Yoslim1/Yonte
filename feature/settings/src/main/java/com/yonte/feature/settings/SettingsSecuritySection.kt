@@ -25,6 +25,7 @@ internal fun SettingsSecurity(
     currentMethod: String,
     isArabic: Boolean,
     onChangeMethod: (String) -> Unit,
+    onSetupRequired: (String) -> Unit,
     onBack: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -48,21 +49,21 @@ internal fun SettingsSecurity(
             title = if (isArabic) "كلمة السر" else "Passphrase",
             description = if (isArabic) "أقوى حماية، تحتاج تذكرها" else "Strongest protection, you need to remember it",
             selected = currentMethod == "PASSPHRASE",
-            onClick = { onChangeMethod("PASSPHRASE") },
+            onClick = { if (currentMethod != "PASSPHRASE") onChangeMethod("PASSPHRASE") },
         )
 
         UnlockMethodOption(
             title = if (isArabic) "الرمز" else "PIN",
             description = if (isArabic) "سريع وسهل، 4-6 أرقام" else "Fast and easy, 4-6 digits",
             selected = currentMethod == "PIN",
-            onClick = { onChangeMethod("PIN") },
+            onClick = { if (currentMethod != "PIN") onSetupRequired("PIN") },
         )
 
         UnlockMethodOption(
             title = if (isArabic) "البصمة" else "Biometric",
             description = if (isArabic) "الأسرع، يحتاج بصمة مسجلة" else "Fastest, requires enrolled fingerprint",
             selected = currentMethod == "BIOMETRIC",
-            onClick = { onChangeMethod("BIOMETRIC") },
+            onClick = { if (currentMethod != "BIOMETRIC") onSetupRequired("BIOMETRIC") },
         )
     }
 }

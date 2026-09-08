@@ -34,6 +34,8 @@ fun SettingsRoute(
     currentVersionCode: Int,
     onClose: () -> Unit,
     localKeyManager: LocalKeyManager,
+    onSetupRequired: (String) -> Unit = {},
+    onMethodChanged: (oldMethod: String, newMethod: String) -> Unit = { _, _ -> },
 ) {
     val context = LocalContext.current
     val viewModel = remember {
@@ -87,9 +89,14 @@ fun SettingsRoute(
                 )
                 SettingsSection.APPEARANCE -> SettingsAppearance(darkTheme, onThemeChanged, isArabic)
                 SettingsSection.SECURITY -> SettingsSecurity(
-                    currentMethod = viewModel.currentUnlockMethod(),
+                    currentMethod = uiState.unlockMethod,
                     isArabic = isArabic,
-                    onChangeMethod = { method -> viewModel.requestUnlockMethodChange(method) },
+                    onChangeMethod = { method ->
+                        val oldMethod = uiState.unlockMethod
+                        viewModel.requestUnlockMethodChange(method)
+                        onMethodChanged(oldMethod, method)
+                    },
+                    onSetupRequired = onSetupRequired,
                     onBack = { viewModel.openSection(null) },
                 )
                 SettingsSection.DATA -> SettingsData(
