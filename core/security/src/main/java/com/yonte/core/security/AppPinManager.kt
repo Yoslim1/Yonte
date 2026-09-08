@@ -2,6 +2,7 @@ package com.yonte.core.security
 
 import android.content.Context
 import android.util.Base64
+import java.security.MessageDigest
 
 class AppPinManager(context: Context) {
     private val prefs = context.applicationContext
@@ -26,7 +27,7 @@ class AppPinManager(context: Context) {
         val expected = Base64.decode(prefs.getString(KEY_HASH, null) ?: return false, Base64.NO_WRAP)
         val actual = Argon2Kdf.deriveWithSalt(pin, salt)
         try {
-            val matches = actual.contentEquals(expected)
+            val matches = MessageDigest.isEqual(actual, expected)
             if (matches) {
                 prefs.edit().putInt(KEY_ATTEMPTS, 0).putLong(KEY_LOCKOUT_UNTIL, 0L).apply()
             } else {

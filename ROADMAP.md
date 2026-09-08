@@ -275,3 +275,4 @@ Instrumented tests على emulator (نفس درس Knote — الأمان محت�
 نهاية المستند. أي قرار جديد يتضاف هنا فورًا وقت اتخاذه، مش يُنسى في محادثة قديمة.
 - [ ] خزنة سرية إضافية (منفصلة عن قفل التطبيق الأساسي، تشفير مستقل) — مرحلة لاحقة، ليست الآن
 - [ ] تثبيت بصمة شهادة توقيع التحديثات (certificateSha256) كقيمة ثابتة جوّه كود التطبيق بدل ما تُجلب من نفس مصدر التحديث البعيد — مرحلة لاحقة، بعد استقرار باقي التطبيق
+- [ ] plain SharedPreferences, values independently encrypted, migrate storage layer to DataStore+Tink if/when justified — deferred from TASK 25
