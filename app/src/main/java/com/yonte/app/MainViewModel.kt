@@ -7,7 +7,7 @@ import com.yonte.core.backup.ScheduledBackupWorker
 import com.yonte.core.database.YonteDatabase
 import com.yonte.core.database.isDatabaseVersionMismatch
 import com.yonte.core.security.AppPinManager
-import com.yonte.core.security.BiometricGateCipher
+import com.yonte.core.security.BiometricUnlockManager
 import com.yonte.core.security.LocalKeyManager
 import com.yonte.feature.onboarding.PinFieldMode
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -26,12 +26,13 @@ internal class MainViewModel @Inject constructor(
     @ApplicationContext private val appContext: Context,
     private val localKeyManager: LocalKeyManager,
     private val appPinManager: AppPinManager,
-    @Suppress("unused") private val biometricGateCipher: BiometricGateCipher,
+    private val biometricUnlockManager: BiometricUnlockManager,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MainUiState())
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
     private var createdPin: CharArray? = null
+    private var pinSubmissionInFlight = false
 
     private var warmDatabase: (suspend () -> Unit)? = null
 
@@ -120,83 +121,96 @@ internal class MainViewModel @Inject constructor(
     }
 
     fun submitPin(pin: CharArray, isArabic: Boolean) {
-        try {
-            _uiState.update { it.copy(unlockErrorMessage = null) }
-            val currentMode = _uiState.value.pinMode
-            if (currentMode == PinFieldMode.CREATE) {
-                val currentCreatedPin = createdPin
-                if (currentCreatedPin == null) {
-                    createdPin = pin.copyOf()
-                    _uiState.update {
-                        it.copy(pinMode = PinFieldMode.CREATE, unlockScreen = MainUiState.UnlockScreen.PIN)
-                    }
-                } else {
-                    if (!pin.contentEquals(currentCreatedPin)) {
-                        currentCreatedPin.fill('\u0000')
-                        createdPin = null
-                        _uiState.update {
-                            it.copy(unlockScreen = MainUiState.UnlockScreen.PIN)
+        if (pinSubmissionInFlight) { pin.fill('\u0000'); return }
+        pinSubmissionInFlight = true
+        val chars = pin.copyOf()
+        pin.fill('\u0000')
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.Default) {
+                    _uiState.update { it.copy(unlockErrorMessage = null) }
+                    val currentMode = _uiState.value.pinMode
+                    if (currentMode == PinFieldMode.CREATE) {
+                        val currentCreatedPin = createdPin
+                        if (currentCreatedPin == null) {
+                            createdPin = chars.copyOf()
+                            _uiState.update {
+                                it.copy(pinMode = PinFieldMode.CREATE, unlockScreen = MainUiState.UnlockScreen.PIN)
+                            }
+                        } else {
+                            if (!chars.contentEquals(currentCreatedPin)) {
+                                currentCreatedPin.fill('\u0000')
+                                createdPin = null
+                                _uiState.update {
+                                    it.copy(unlockScreen = MainUiState.UnlockScreen.PIN)
+                                }
+                            } else {
+                                appPinManager.setPin(chars)
+                                localKeyManager.setUnlockMethod(LocalKeyManager.METHOD_PIN)
+                                localKeyManager.cachedSessionKey()?.let { localKeyManager.cachePinUnlockKey(it) }
+                                currentCreatedPin.fill('\u0000')
+                                createdPin = null
+                                _uiState.update {
+                                    it.copy(unlockScreen = null)
+                                }
+                                onUnlocked()
+                                refreshAutoBackupKeyCacheIfEnabled()
+                            }
                         }
                     } else {
-                        appPinManager.setPin(pin)
-                        localKeyManager.setUnlockMethod(LocalKeyManager.METHOD_PIN)
-                        localKeyManager.cachedSessionKey()?.let { localKeyManager.cachePinUnlockKey(it) }
-                        currentCreatedPin.fill('\u0000')
-                        createdPin = null
-                        _uiState.update {
-                            it.copy(unlockScreen = null)
+                        if (appPinManager.lockoutSecondsRemaining() > 0) {
+                            val secs = appPinManager.lockoutSecondsRemaining()
+                            _uiState.update {
+                                it.copy(unlockErrorMessage = if (isArabic) "انتظر $secs ثانية" else "Wait $secs seconds")
+                            }
+                            return@withContext
                         }
-                        onUnlocked()
-                        refreshAutoBackupKeyCacheIfEnabled()
-                    }
-                }
-            } else {
-                if (appPinManager.lockoutSecondsRemaining() > 0) {
-                    val secs = appPinManager.lockoutSecondsRemaining()
-                    _uiState.update {
-                        it.copy(unlockErrorMessage = if (isArabic) "انتظر $secs ثانية" else "Wait $secs seconds")
-                    }
-                    return
-                }
-                if (appPinManager.verify(pin)) {
-                    val pinUnlockKey = localKeyManager.cachedPinUnlockKey()
-                    if (pinUnlockKey == null) {
-                        _uiState.update {
-                            it.copy(
-                                unlockScreen = MainUiState.UnlockScreen.PASSPHRASE,
-                                unlockErrorMessage = if (isArabic)
-                                    "محتاجين نعيد الإعداد، ادخل كلمة السر" else "Setup needs to be refreshed — enter your passphrase",
-                            )
+                        if (appPinManager.verify(chars)) {
+                            val pinUnlockKey = localKeyManager.cachedPinUnlockKey()
+                            if (pinUnlockKey == null) {
+                                _uiState.update {
+                                    it.copy(
+                                        unlockScreen = MainUiState.UnlockScreen.PASSPHRASE,
+                                        unlockErrorMessage = if (isArabic)
+                                            "محتاجين نعيد الإعداد، ادخل كلمة السر" else "Setup needs to be refreshed — enter your passphrase",
+                                    )
+                                }
+                                return@withContext
+                            }
+                            localKeyManager.cacheSessionKeyDirectly(pinUnlockKey)
+                            _uiState.update { it.copy(unlockScreen = null) }
+                            onUnlocked()
+                            refreshAutoBackupKeyCacheIfEnabled()
+                        } else {
+                            val remaining = appPinManager.lockoutSecondsRemaining()
+                            _uiState.update {
+                                it.copy(
+                                    unlockErrorMessage = if (remaining > 0) {
+                                        if (isArabic) "انتظر $remaining ثانية" else "Wait $remaining seconds"
+                                    } else {
+                                        if (isArabic) "رمز غلط" else "Wrong PIN"
+                                    },
+                                )
+                            }
                         }
-                        return
-                    }
-                    localKeyManager.cacheSessionKeyDirectly(pinUnlockKey)
-                    _uiState.update { it.copy(unlockScreen = null) }
-                    onUnlocked()
-                    refreshAutoBackupKeyCacheIfEnabled()
-                } else {
-                    val remaining = appPinManager.lockoutSecondsRemaining()
-                    _uiState.update {
-                        it.copy(
-                            unlockErrorMessage = if (remaining > 0) {
-                                if (isArabic) "انتظر $remaining ثانية" else "Wait $remaining seconds"
-                            } else {
-                                if (isArabic) "رمز غلط" else "Wrong PIN"
-                            },
-                        )
                     }
                 }
+            } finally {
+                chars.fill('\u0000')
+                pinSubmissionInFlight = false
             }
-        } finally {
-            pin.fill('\u0000')
         }
     }
 
     fun handleBiometricUnlockSuccess(sessionKey: ByteArray) {
-        localKeyManager.cacheSessionKeyDirectly(sessionKey)
-        _uiState.update { it.copy(unlockScreen = null) }
-        onUnlocked()
-        refreshAutoBackupKeyCacheIfEnabled()
+        try {
+            localKeyManager.cacheSessionKeyDirectly(sessionKey)
+            _uiState.update { it.copy(unlockScreen = null) }
+            onUnlocked()
+            refreshAutoBackupKeyCacheIfEnabled()
+        } finally {
+            sessionKey.fill(0)
+        }
     }
 
     fun handleBiometricUnlockError(errorCode: Int, errString: CharSequence) {
@@ -234,10 +248,6 @@ internal class MainViewModel @Inject constructor(
                 )
             }
         }
-    }
-
-    fun chooseBiometricUnlock() {
-        localKeyManager.setUnlockMethod(LocalKeyManager.METHOD_BIOMETRIC)
     }
 
     fun choosePinCreate() {
@@ -279,5 +289,6 @@ internal class MainViewModel @Inject constructor(
         super.onCleared()
         createdPin?.fill('\u0000')
         createdPin = null
+        pinSubmissionInFlight = false
     }
 }
