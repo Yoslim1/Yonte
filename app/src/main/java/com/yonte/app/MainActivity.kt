@@ -2,7 +2,6 @@ package com.yonte.app
 
 import android.content.Intent
 import android.os.Bundle
-import android.util.Base64
 import androidx.activity.viewModels
 import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.setContent
@@ -19,7 +18,7 @@ import com.yonte.core.backup.BackupGateway
 import com.yonte.core.database.NoteRepository
 import com.yonte.core.designsystem.YonteTheme
 import com.yonte.core.security.AppPinManager
-import com.yonte.core.security.BiometricGateCipher
+import com.yonte.core.security.BiometricUnlockManager
 import com.yonte.core.security.LocalKeyManager
 import com.yonte.core.update.UpdateGateway
 import dagger.Lazy
@@ -55,7 +54,7 @@ class MainActivity : FragmentActivity() {
     @Inject lateinit var updateGateway: UpdateGateway
     @Inject lateinit var localKeyManager: LocalKeyManager
     @Inject lateinit var appPinManager: AppPinManager
-    @Inject lateinit var biometricGateCipher: BiometricGateCipher
+    @Inject lateinit var biometricUnlockManager: BiometricUnlockManager
 
     private val viewModel: MainViewModel by viewModels()
 
@@ -98,8 +97,10 @@ class MainActivity : FragmentActivity() {
                         biometricAvailable = biometricAvailable,
                         isArabic = isArabic(),
                         onChooseBiometric = {
-                            viewModel.chooseBiometricUnlock()
-                            launchBiometricSetupPrompt {
+                            launchBiometricSetupPrompt { setupSucceeded ->
+                                if (setupSucceeded) {
+                                    localKeyManager.setUnlockMethod(LocalKeyManager.METHOD_BIOMETRIC)
+                                }
                                 viewModel.clearUnlockError()
                                 viewModel.onUnlocked()
                             }
@@ -154,13 +155,17 @@ class MainActivity : FragmentActivity() {
                 try {
                     val cryptoCipher = result.cryptoObject?.cipher
                     if (cryptoCipher != null) {
-                        val encryptedData = Base64.decode(
-                            getSharedPreferences("yonte_biometric_cache", MODE_PRIVATE)
-                                .getString("cache_data", null),
-                            Base64.NO_WRAP,
-                        )
-                        val sessionKey = cryptoCipher.doFinal(encryptedData)
-                        viewModel.handleBiometricUnlockSuccess(sessionKey)
+                        try {
+                            val sessionKey = biometricUnlockManager.unwrapSessionKey(cryptoCipher)
+                            viewModel.handleBiometricUnlockSuccess(sessionKey)
+                        } catch (_: Exception) {
+                            // Decryption failed (missing or corrupted cache) — fall back
+                            biometricUnlockManager.clearEnrolledKey()
+                            localKeyManager.setUnlockMethod(
+                                if (appPinManager.isPinSet()) LocalKeyManager.METHOD_PIN else LocalKeyManager.METHOD_PASSPHRASE,
+                            )
+                            viewModel.switchToPinOrPassphrase()
+                        }
                     } else {
                         viewModel.handleBiometricUnlockFailure(isArabic())
                     }
@@ -181,55 +186,61 @@ class MainActivity : FragmentActivity() {
             .setNegativeButtonText(if (isArabic()) "إلغاء" else "Cancel")
             .build()
 
-        try {
-            val iv = Base64.decode(
-                getSharedPreferences("yonte_biometric_cache", MODE_PRIVATE)
-                    .getString("cache_iv", null),
-                Base64.NO_WRAP,
-            )
-            val cipher = biometricGateCipher.decryptCipher(iv)
-            BiometricPrompt(this, executor, callback).authenticate(
-                promptInfo,
-                BiometricPrompt.CryptoObject(cipher),
-            )
-        } catch (e: Exception) {
-            if (e is android.security.keystore.KeyPermanentlyInvalidatedException ||
-                generateSequence(e as Throwable?) { it.cause }.any { it is android.security.keystore.KeyPermanentlyInvalidatedException }
-            ) {
-                localKeyManager.setUnlockMethod(
-                    if (appPinManager.isPinSet()) LocalKeyManager.METHOD_PIN else LocalKeyManager.METHOD_PASSPHRASE,
+        val cipher = biometricUnlockManager.buildDecryptCipher()
+        if (cipher != null) {
+            try {
+                BiometricPrompt(this, executor, callback).authenticate(
+                    promptInfo,
+                    BiometricPrompt.CryptoObject(cipher),
                 )
-                viewModel.switchToPinOrPassphrase()
-            } else {
-                viewModel.handleBiometricUnlockFailure(isArabic())
+            } catch (e: Exception) {
+                if (e is android.security.keystore.KeyPermanentlyInvalidatedException ||
+                    generateSequence(e as Throwable?) { it.cause }.any { it is android.security.keystore.KeyPermanentlyInvalidatedException }
+                ) {
+                    biometricUnlockManager.clearEnrolledKey()
+                    localKeyManager.setUnlockMethod(
+                        if (appPinManager.isPinSet()) LocalKeyManager.METHOD_PIN else LocalKeyManager.METHOD_PASSPHRASE,
+                    )
+                    viewModel.switchToPinOrPassphrase()
+                } else {
+                    viewModel.handleBiometricUnlockFailure(isArabic())
+                }
             }
+        } else {
+            // No IV stored — biometric key is missing or never enrolled
+            biometricUnlockManager.clearEnrolledKey()
+            localKeyManager.setUnlockMethod(
+                if (appPinManager.isPinSet()) LocalKeyManager.METHOD_PIN else LocalKeyManager.METHOD_PASSPHRASE,
+            )
+            viewModel.switchToPinOrPassphrase()
         }
     }
 
-    private fun launchBiometricSetupPrompt(onDone: () -> Unit) {
+    private fun launchBiometricSetupPrompt(onResult: (Boolean) -> Unit) {
         val sessionKey = localKeyManager.cachedSessionKey()
-        if (sessionKey == null) { onDone(); return }
+        if (sessionKey == null) { onResult(false); return }
         val executor = ContextCompat.getMainExecutor(this)
         val callback = object : BiometricPrompt.AuthenticationCallback() {
             override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                 super.onAuthenticationSucceeded(result)
+                var success = false
                 try {
                     val cipher = result.cryptoObject?.cipher
                     if (cipher != null) {
-                        val encrypted = cipher.doFinal(sessionKey)
-                        getSharedPreferences("yonte_biometric_cache", MODE_PRIVATE).edit()
-                            .putString("cache_iv", Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
-                            .putString("cache_data", Base64.encodeToString(encrypted, Base64.NO_WRAP))
-                            .apply()
+                        biometricUnlockManager.persistEncryptedKey(cipher, sessionKey)
+                        success = true
                     }
                 } catch (_: Exception) {
+                } finally {
+                    sessionKey.fill(0)
                 }
-                onDone()
+                onResult(success)
             }
 
             override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                 super.onAuthenticationError(errorCode, errString)
-                onDone()
+                sessionKey.fill(0)
+                onResult(false)
             }
         }
         val promptInfo = BiometricPrompt.PromptInfo.Builder()
@@ -238,10 +249,12 @@ class MainActivity : FragmentActivity() {
             .setNegativeButtonText(if (isArabic()) "إلغاء" else "Cancel")
             .build()
         try {
-            val cipher = biometricGateCipher.encryptCipher()
+            val cipher = biometricUnlockManager.buildEncryptCipher()
             BiometricPrompt(this, executor, callback).authenticate(promptInfo, BiometricPrompt.CryptoObject(cipher))
         } catch (_: Exception) {
-            onDone()
+            onResult(false)
+        } finally {
+            sessionKey.fill(0)
         }
     }
 
@@ -288,6 +301,34 @@ class MainActivity : FragmentActivity() {
                 currentVersionCode = BuildConfig.VERSION_CODE,
                 onClose = { showSettings = false },
                 localKeyManager = localKeyManager,
+                onSetupRequired = { method ->
+                    when (method) {
+                        LocalKeyManager.METHOD_BIOMETRIC -> {
+                            showSettings = false
+                            launchBiometricSetupPrompt { setupSucceeded ->
+                                if (setupSucceeded) {
+                                    localKeyManager.setUnlockMethod(LocalKeyManager.METHOD_BIOMETRIC)
+                                } else {
+                                    android.widget.Toast.makeText(
+                                        this,
+                                        if (isArabic()) "لم يتم إعداد البصمة" else "Biometric setup was not completed",
+                                        android.widget.Toast.LENGTH_SHORT,
+                                    ).show()
+                                }
+                                viewModel.clearUnlockError()
+                            }
+                        }
+                        LocalKeyManager.METHOD_PIN -> {
+                            showSettings = false
+                            viewModel.choosePinCreate()
+                        }
+                    }
+                },
+                onMethodChanged = { oldMethod, newMethod ->
+                    if (oldMethod == LocalKeyManager.METHOD_BIOMETRIC && newMethod != LocalKeyManager.METHOD_BIOMETRIC) {
+                        biometricUnlockManager.clearEnrolledKey()
+                    }
+                },
             )
         } else {
             NotesRoute(
