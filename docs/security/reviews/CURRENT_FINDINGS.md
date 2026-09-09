@@ -10,7 +10,7 @@ Implementation findings confirmed while auditing the current `main` production c
 
 `launchBiometricSetupPrompt` starts asynchronous biometric authentication but zeroes the captured session-key buffer when `authenticate()` returns. The later callback can observe zeroed key material and persist an unusable biometric cache.
 
-Required fix: give the asynchronous operation its own key copy and clear it exactly once on terminal success/error/cancel/exception. Add regression coverage.
+Required fix: the asynchronous enrollment operation owns one mutable session-key buffer until terminal completion. `LocalKeyManager.cachedSessionKey()` already returns an independently decrypted `ByteArray`, so callers should not create another secret copy without a demonstrated ownership need. Clear the operation-owned buffer exactly once on terminal success/error/cancel/synchronous exception. Add regression coverage for delayed callbacks and duplicate terminal signals.
 
 ## P1
 
@@ -24,7 +24,7 @@ Scheduled backup currently reuses session-key lineage. Portable recovery semanti
 
 ### SEC-004 — Authorization platform missing
 
-Capability/resource/confirmation policy must exist before AI receives cross-feature access.
+Capability/resource/confirmation policy must exist before AI receives cross-feature access. Security owns authorization decisions and policy evaluation; feature/domain contracts own their semantic capability vocabulary and resource semantics, while global entity identity remains a data/platform contract.
 
 ## P2
 

@@ -14,10 +14,18 @@ A decision may be:
 - `DENY`
 - `CONFIRMATION_REQUIRED`
 
+## Ownership
+
+- Security owns the authorization decision model, policy evaluation, confirmation rules, and policy versioning.
+- Each bounded context owns the semantic capability vocabulary and resource semantics for that domain (for example Notes may define `notes.read` or `notes.update`).
+- Global entity identity/reference semantics belong to the data/platform identity contract, not to Security.
+- Security consumes stable actor/resource references and capability identifiers; it does not own Room entities, feature models, or persistence schemas.
+- A future capability registry may aggregate descriptors for discovery without transferring capability ownership away from the defining domain.
+
 ## Required dimensions
 
 - actor identity/type.
-- capability (`notes.read`, `notes.update`, `notes.delete`, etc.).
+- capability identifier.
 - resource/entity scope.
 - data classification.
 - standing user permission.
@@ -38,4 +46,4 @@ Record actor, capability, entity reference, decision, policy version, timestamp,
 
 ## Non-goals
 
-This file does not implement feature business rules or database access.
+This boundary does not implement feature business rules, define feature-specific capability enums/classes, own global entity identity, or access databases directly.

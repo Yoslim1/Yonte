@@ -15,6 +15,7 @@ Index for durable architecture decisions. Each ADR owns one decision and records
 - `ADR-007-security-boundary-separation.md` — authentication, authorization, and key wrapping are distinct.
 - `ADR-008-notes-domain-boundary.md` — introduce `:domain:notes` first; defer `:data:notes` until it provides real isolation.
 - `ADR-009-update-trust-anchor.md` — trust downloaded updates against installed package identity/signing lineage, not mutable remote signer metadata.
+- `ADR-010-authorization-identity-ownership.md` — Security owns authorization policy; data/platform owns global identity and bounded contexts own capability semantics.
 
 ## Rule
 
