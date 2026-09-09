@@ -4,6 +4,8 @@
 
 Define evidence required before non-trivial architectural changes are accepted.
 
+Classify the change first using `../governance/CHANGE_CLASSIFICATION.md`. Completion is judged against `../governance/DEFINITION_OF_DONE.md`.
+
 ## Standard gate
 
 - current-state inspection.
