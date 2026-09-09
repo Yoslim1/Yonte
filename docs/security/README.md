@@ -1,21 +1,24 @@
 # Security Documentation Map
 
-This directory follows a modular security documentation model.
+## Purpose
 
-## Principles
+Navigate Yonte security doctrine without requiring a reviewer to read the entire security system.
+
+## Authoritative areas
+
+- `SECURITY_DOCTRINE.md` — doctrine index.
+- `SECURITY_ARCHITECTURE_AUDIT.md` — current-audit index.
+- `THREAT_MODEL.md` — threat-model index.
+- `principles/` — core invariants and data classification.
+- `architecture/` — authentication, authorization, key lifecycle, and boundary map.
+- `threats/` — focused threat domains.
+- `reviews/` — current findings and review procedure.
+
+Durable security architecture decisions live with the platform ADRs under `../architecture/decisions/` so one decision system governs the repository.
+
+## Documentation rules
 
 - One responsibility per document.
-- Short reviewable documents over large encyclopedic files.
-- Current implementation, decisions, threats, and future design are separated.
-- Every document should have clear ownership and lifecycle.
-
-## Structure
-
-- `principles/` - security principles and invariants.
-- `architecture/` - security architecture and boundaries.
-- `threats/` - threat models and attack analysis.
-- `decisions/` - ADRs for security decisions.
-- `operations/` - operational security procedures.
-- `reviews/` - audits and findings.
-
-A reviewer should be able to understand one security area without reading the entire security system.
+- Current implementation, target policy, threats, decisions, and findings remain distinct.
+- Index files navigate; they do not duplicate policy.
+- Create a new focused document only when a genuinely new responsibility exists.
