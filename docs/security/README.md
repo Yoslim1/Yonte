@@ -18,7 +18,9 @@ Durable security architecture decisions live with the platform ADRs under `../ar
 
 ## Documentation rules
 
-- One responsibility per document.
-- Current implementation, target policy, threats, decisions, and findings remain distinct.
-- Index files navigate; they do not duplicate policy.
-- Create a new focused document only when a genuinely new responsibility exists.
+- Group tightly related small security concerns when they share the same boundary, reviewer, authority, and reason to change.
+- Split when a concern gains an independent lifecycle, owner, review gate, or enough complexity that the combined document becomes harder to reason about.
+- Keep current implementation facts, target policy, threats, decisions, and findings distinguishable; combine them only when doing so cannot blur authority or shipped-vs-target behavior.
+- Index files navigate; they may orient the reader briefly but do not duplicate authoritative policy.
+- Create a new focused document only when it improves ownership, reviewability, or change isolation—not merely to enforce one topic per file.
+- Avoid both security megadocuments and fragmented micro-documents.
