@@ -14,7 +14,7 @@
   zero it exactly once at terminal completion, and ignore duplicate terminal
   callbacks. Persistence failures and synchronous setup/start failures report
   enrollment failure without changing existing PIN/passphrase fallback behavior.
-  (implementation commit: `cd5c046`)
+  (implementation commit: `7970e82`)
 
 ## Unreleased — restore SettingsViewModel CI fixture contract (2026-09-09)
 
