@@ -13,6 +13,7 @@ Index for durable architecture decisions. Each ADR owns one decision and records
 - `ADR-005-ai-authorization.md` — capability-based AI permissions plus risk-based confirmation.
 - `ADR-006-backup-recovery-keys.md` — separate unattended device wrapping from portable recovery.
 - `ADR-007-security-boundary-separation.md` — authentication, authorization, and key wrapping are distinct.
+- `ADR-008-notes-domain-boundary.md` — introduce `:domain:notes` first; defer `:data:notes` until it provides real isolation.
 
 ## Rule
 
