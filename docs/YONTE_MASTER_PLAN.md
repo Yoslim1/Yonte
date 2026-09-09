@@ -224,6 +224,8 @@ Current hardening priorities include:
 - biometric async secret lifetime (#3).
 - candidate-key derivation vs authenticated-session commit (#15).
 - KDF secret-memory hygiene with compatibility proof (#16).
+- PIN lockout clock/threat semantics (#19).
+- lifecycle-specific key responsibility decomposition where justified (#20).
 - automatic-backup authority lifecycle (#14).
 - update signer/package trust (#11).
 
@@ -345,8 +347,10 @@ Current known issues:
 - automatic-backup key presence is not perfectly aligned with enabled/configured state (#14).
 - Worker currently constructs too much infrastructure and must become a thin OS adapter after policy/data dependencies are explicit (#10).
 - current restore does not yet enforce the full version-aware staged/conflict-safe pipeline required by policy (#18).
+- write success does not yet prove a reopenable/authenticated recovery point or preserve verified generations explicitly (#25).
+- accepted recovery-key separation still requires a backward-compatible runtime migration (#26 / ADR-006).
 
-Portable recovery target may eventually separate:
+Accepted portable recovery migration target separates:
 
 - high-entropy Backup Master Key.
 - device-local Keystore wrapping for unattended backup.
@@ -370,7 +374,7 @@ backup
 
 Failure leaves live data untouched.
 
-Support verified generations/last-known-good semantics when justified; do not trust "latest" merely because it exists.
+Verified generation/last-known-good semantics are tracked by #25; do not trust "latest" merely because it exists.
 
 ## 17. Errors and observability
 
@@ -388,6 +392,8 @@ Canonical failure metadata may include:
 Unknown failures preserve data and stop unsafe continuation.
 
 Audit/observability may record actor, capability, entity reference, result, timing, error code, policy version, and correlation ID—but never bodies, passphrases, keys, tokens, or protected content.
+
+The minimal runtime failure/correlation/diagnostics foundation is tracked by #24 and must be proven through real foundation consumers rather than a standalone logging framework.
 
 ## 18. Concurrency and consistency
 
@@ -528,36 +534,38 @@ Execute by dependency, not merely issue number:
 4. Settings presentation lifecycle ownership after operation lifetimes are explicit (#8).
 5. automatic-backup key lifecycle correctness (#14).
 6. thin ScheduledBackupWorker after policy/data/key dependencies are explicit (#10).
-7. semantic architecture enforcement after each migrated boundary (#6).
+7. incremental `LocalKeyManager` lifecycle decomposition only where #15/#14 and related tests establish a stable ownership boundary (#20).
+8. semantic architecture enforcement after each migrated boundary (#6).
 
 Independent safe work may move within this phase when its prerequisite is already satisfied.
 
 ### Phase 3 — Backup/recovery hardening
 
-- explicit symmetric manual portable-backup credentials (#12).
+- explicit symmetric manual portable-backup credentials + owned derived-key cleanup (#12).
 - version-aware staged restore with semantic validation, explicit conflict planning, atomic apply, and post-restore verification (#18).
-- verified generations/last-known-good where justified.
-- recovery-key lifecycle + versioned backward compatibility.
-- corruption/interruption/wrong-credential/incompatible-version/storage failure tests.
+- readback-verified generations and last-known-good retention (#25).
+- backward-compatible Backup Master Key/device-wrapper/portable-recovery-capsule migration (#26 / ADR-006).
+- corruption/interruption/wrong-credential/incompatible-version/storage failure tests across #10/#12/#18/#25/#26.
 
 ### Phase 4 — Global identity/relationships
 
-- stable entity references/revisions/provenance/ownership.
+- implement the minimal stable entity reference/revision/provenance/ownership baseline (#21 / ADR-001/ADR-010).
 - relation semantics without centralizing feature content.
 - reviewed Room migrations using committed schemas/tests.
 
 ### Phase 5 — Authorization/consent
 
-- capability/resource/risk/sensitivity policy.
-- bounded contexts define semantic capability vocabulary; Security evaluates it (ADR-010).
-- user-owned AI permission persistence.
+- implement generic policy/decision + standing-permission/confirmation boundaries (#22 / ADR-005/ADR-010).
+- bounded contexts define semantic capability vocabulary; Security evaluates it.
+- user-owned permission persistence/versioning before AI use.
 - authorization remains separate from confirmation.
 
 ### Phase 6 — Commands/queries/events
 
+- implement the typed command/query/event pattern on a real existing cross-boundary need (#23 / ADR-003/ADR-004).
 - typed request/response contracts where integration requires them.
-- events for completed facts/fan-out.
-- transactional outbox/idempotency only where reliability requires it.
+- events for completed facts/fan-out with references-not-secrets.
+- transactional outbox/idempotency only where reliability evidence requires it.
 
 ### Phase 7 — AI platform
 
@@ -575,7 +583,8 @@ Apply when safe and relevant rather than postponing by phase number:
 
 - installed-package/signing-lineage update trust (#11 / ADR-009).
 - KDF memory hygiene only after byte-for-byte compatibility vectors (#16).
-- PIN rate-limit clock hardening only after its clock/reboot threat model is explicit.
+- PIN rate-limit clock hardening only after its clock/reboot threat model is explicit (#19).
+- typed failure/correlation/privacy-safe diagnostics through real consumers (#24).
 - accessibility/localization/RTL.
 - resource/performance budgets.
 - release/rollback/rollout.
@@ -609,6 +618,14 @@ Live issue state on GitHub is authoritative. Current tracked foundation work inc
 - #16 — remove immutable KDF secret copies with UTF-8 compatibility proof.
 - #17 — live foundation completion gate before any new product domain/service.
 - #18 — version-aware staged/conflict-safe restore with post-restore verification.
+- #19 — PIN lockout clock/threat semantics.
+- #20 — lifecycle-specific `LocalKeyManager` decomposition without a replacement God object.
+- #21 — global entity identity/relationship runtime baseline.
+- #22 — authorization/confirmation/standing-permission foundation.
+- #23 — typed command/query/event integration foundation.
+- #24 — typed failure/correlation/privacy-safe diagnostics runtime foundation.
+- #25 — readback-verified backup generations and last-known-good recovery points.
+- #26 — Backup Master Key/device-wrapper/portable recovery-capsule migration.
 
 ## 28. Accepted durable decisions
 
