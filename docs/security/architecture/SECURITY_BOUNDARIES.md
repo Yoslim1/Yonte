@@ -1,39 +1,20 @@
-# Security Boundaries
+# Security Boundary Map
 
 ## Purpose
 
-Define where security responsibilities live and prevent accidental coupling.
+Navigate the authoritative security boundaries without duplicating their rules.
 
-## Core Boundaries
+## Boundaries
 
-### Authentication Boundary
+- `AUTHENTICATION_BOUNDARY.md` — proving eligibility to establish/open a protected session.
+- `AUTHORIZATION_BOUNDARY.md` — deciding whether an actor may perform a capability on a resource now.
+- `KEY_LIFECYCLE.md` — purpose-specific key ownership, wrapping, rotation, migration, and recovery.
+- `../principles/DATA_CLASSIFICATION.md` — handling requirements that follow sensitive data across boundaries.
 
-Responsible for proving user presence or knowledge.
+## Global rule
 
-Examples:
+Authentication, authorization, and key wrapping are distinct responsibilities. Their durable separation is recorded in `../../architecture/decisions/ADR-007-security-boundary-separation.md`.
 
-- passphrase verification.
-- PIN verification.
-- biometric authentication.
+## Non-goal
 
-Authentication does not automatically grant every capability.
-
-### Key Management Boundary
-
-Responsible for key creation, wrapping, storage, rotation, and lifecycle.
-
-Keys must have explicit purpose.
-
-### Authorization Boundary
-
-Responsible for deciding whether an actor or feature may perform an action.
-
-Future AI features must use this boundary.
-
-### Data Protection Boundary
-
-Responsible for encrypted storage and recovery guarantees.
-
-## Rule
-
-No module should silently combine authentication, authorization, and encryption responsibilities.
+This document defines no additional security policy; detailed rules belong to the linked authoritative documents.
