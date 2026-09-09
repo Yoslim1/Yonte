@@ -2,123 +2,119 @@
 
 ## 1. Purpose
 
-This is the durable master map for Yonte.
+This is Yonte's durable project map.
 
-It answers four questions for any future engineer, reviewer, or coding agent:
+It records the final direction we are building toward, the accepted architecture decisions, the dependency order for implementation, and the authoritative documents that contain deeper detail.
 
-1. What is Yonte ultimately intended to become?
-2. Which architectural and product decisions have already been made?
-3. In what dependency order should the platform evolve?
-4. Where is the authoritative detail for each decision or subsystem?
+It is intentionally broader than focused ADR/security/data documents, but it must not duplicate their implementation detail. When a durable decision changes, update the relevant ADR first and then synchronize this file.
 
-This document is intentionally broad but not encyclopedic. It summarizes the whole direction and links to focused authoritative documents. It must remain understandable in one review session.
+## 2. Authority order
 
-## 2. Authority model
-
-Use the following source hierarchy when this plan and another repository artifact appear to disagree:
+When artifacts disagree, use this order:
 
 1. explicit current user requirement.
 2. security/data-integrity invariants and `AGENTS.md` execution policy.
-3. accepted Architecture Decision Records (ADRs).
-4. Yonte Architecture Constitution and specialized security/backup/data doctrine.
-5. actual current production code, build configuration, and CI state for implementation facts.
-6. this Master Plan for product destination, migration order, and cross-domain orientation.
-7. operational issues/PRs for live implementation status.
+3. accepted Architecture Decision Records.
+4. Architecture Constitution and specialized security/data/backup doctrine.
+5. actual production code/build/CI for current implementation facts.
+6. this Master Plan for destination and dependency order.
+7. Issues/PRs for live execution status.
 
-This file does not silently supersede an ADR. A durable architecture decision changes through a new or superseding ADR, then this file is updated to reflect the decision.
+Chat is a design workspace, not the durable source of truth. Material final decisions must enter the repository.
 
 ## 3. Product destination
 
-Yonte is not intended to remain a notes application.
+Yonte evolves into a **Secure Personal Intelligence Workspace**: a local-first personal platform in which multiple domains cooperate without sacrificing user ownership, security, recoverability, or independent evolution.
 
-The long-term product is a **Secure Personal Intelligence Workspace**: a local-first personal platform where notes, tasks, calendar/events, files, future personal domains, automation, and AI cooperate without sacrificing user ownership, security, or feature independence.
-
-Core product properties:
-
-- local-first and useful without an account or server.
-- private by default.
-- encrypted sensitive data at rest.
-- feature-rich without becoming a monolith of tangled implementation dependencies.
-- AI deeply integrated, but permissioned and unable to bypass feature ownership/security boundaries.
-- resilient backup/recovery as a first-class capability rather than an afterthought.
-- English and Arabic/RTL treated as product-level requirements.
-- Android remains the current product platform; future sync/cloud capability must not distort the local architecture before it is actually needed.
-
-## 4. Product evolution direction
-
-The current mature domain is Notes. Future product domains are added only after the architecture prerequisites relevant to them are ready.
-
-Expected long-term capability families include:
+Long-term capability families may include:
 
 - Notes and personal knowledge.
 - Tasks and actionable work.
 - Calendar/events and time-oriented context.
 - Files/attachments and personal artifacts.
-- Habits or other personal workflows when product value justifies them.
-- Financial/personal sensitive domains only behind stronger privacy and authorization gates.
-- AI Assistant as a first-class interaction surface over user-authorized capabilities.
-- automation and cross-feature workflows built through contracts/events, not direct implementation coupling.
+- Habits or other personal workflows when justified by product value.
+- Financial/personal sensitive domains only behind stronger privacy/authorization gates.
+- AI Assistant as a first-class governed interface over user-authorized capabilities.
+- automation and cross-feature workflows built through stable contracts.
 
-The list is directional, not a requirement to build every possible module. Product value and architecture readiness determine what ships.
+No new product domain is added merely because it appears here. Foundation readiness and product value determine what ships.
 
-## 5. Product experience and identity
-
-Yonte should feel like one coherent product even when features have distinct internal UX.
-
-Current visual/product direction:
+Current product identity direction:
 
 - positioning: **Secure Personal Intelligence Workspace**.
-- brand palette direction: Deep Navy `#071A33`, Cyan `#00C8FF`, Silver `#DCE7F5`.
-- logo direction: layered stylized `Y`, expressing security, knowledge, tasks/services, and connected layers.
-- current preferred UI concept is the original English concept; Arabic/RTL remains first-class and must be designed deliberately rather than mechanically mirrored.
+- Deep Navy `#071A33`, Cyan `#00C8FF`, Silver `#DCE7F5`.
+- layered stylized `Y` visual identity.
+- English concept remains the current preferred visual reference; Arabic/RTL is first-class and must be deliberately designed.
 
-Shared design laws include color/typography/spacing tokens, accessibility, navigation language, error/confirmation patterns, motion principles, and security affordances. A feature may have its own visual culture without creating a second design system.
+## 4. Architectural model
 
-See `docs/design/` for authoritative design-system and accessibility/localization rules.
-
-## 6. Architectural model — modular personal platform
-
-Yonte evolves as a **modular monolith / personal platform**, not as microservices inside an Android app.
+Yonte is a **modular monolith / personal platform**, not microservices inside Android.
 
 Mental model:
 
 ```text
-                    YONTE PLATFORM
+                         YONTE PLATFORM
 
-          security / identity / recovery laws
-                       |
-        ---------------------------------
-        |           |          |        |
-      Notes       Tasks     Calendar    Files ...
-        |           |          |        |
-        -------- stable contracts -------
-                       |
-        commands / queries / events / AI
+       security policy / data identity / recovery / quality laws
+                              |
+        -------------------------------------------------
+        |              |              |                |
+      Notes          Tasks         Calendar           Files ...
+        |              |              |                |
+        ------------- stable contracts -----------------
+                              |
+                commands / queries / events
+                              |
+                   governed AI / automation
 ```
 
-Features are sovereign bounded contexts ("islands/countries") under shared platform laws.
+Features are sovereign bounded contexts ("countries/islands") under shared platform laws.
 
-A feature owns its domain meaning, behavior, presentation, and data semantics. It may change its UI, implementation, search strategy, or storage adapter without forcing unrelated features to change.
+A feature owns:
 
-High connectivity is allowed and expected. High coupling is not.
+- its domain meaning and rules.
+- its presentation/UX.
+- its data semantics.
+- its contracts/capabilities.
+- its internal implementation choices.
 
-See:
+A feature may substantially change internally without forcing unrelated features to change.
 
-- `docs/architecture/constitution/FEATURE_SOVEREIGNTY.md`
-- `docs/architecture/constitution/PLATFORM_BOUNDARIES.md`
-- `docs/architecture/decisions/ADR-002-feature-data-ownership.md`
+**High connectivity is expected. High implementation coupling is not.**
 
-## 7. Module and dependency strategy
+## 5. Platform/core responsibilities
 
-The module graph should express real ownership boundaries, not architectural decoration.
+Shared platform capabilities exist only when they are genuinely cross-cutting.
 
-Current shared infrastructure remains in focused `core` modules such as security, encrypted database infrastructure, backup, update, design system, and navigation.
+Current/future platform areas include:
 
-The application module is the composition root. It wires implementations to contracts and owns top-level Android lifecycle/navigation orchestration; it should not accumulate feature business logic.
+- encrypted physical storage infrastructure.
+- security/authentication/authorization policy.
+- key lifecycle/crypto infrastructure.
+- backup/recovery infrastructure.
+- update trust/release safety.
+- design system/accessibility/localization laws.
+- navigation/composition infrastructure.
+- errors/observability/background-work/time policies.
 
-Feature modules own presentation and feature behavior. They do not depend on other feature implementation modules.
+The `app` module remains the composition root. It wires implementations to contracts and owns top-level Android lifecycle/navigation orchestration, not feature business logic.
 
-Domain contract modules are introduced only when they create a useful stable boundary. The preferred first Notes migration is:
+Avoid an omnipotent `SecurityManager`, `CoreManager`, service locator, or generic platform module that becomes a dumping ground.
+
+## 6. Module strategy
+
+Modules express real ownership/change isolation, not architectural decoration.
+
+Rules:
+
+- feature implementation modules do not depend on other feature implementation modules.
+- `core` does not depend on feature/app.
+- domain contract modules are introduced only when they create a useful stable boundary.
+- no generic `core:domain` containing every feature model.
+- do not create `:data:<feature>` modules merely to match textbook layering.
+- extract a data module only when it can own persistence/transaction concerns cleanly and reduce ripple.
+
+Preferred first Notes migration (ADR-008):
 
 ```text
                  :domain:notes
@@ -131,88 +127,75 @@ Domain contract modules are introduced only when they create a useful stable bou
                  composition root
 ```
 
-`:domain:notes` may cohesively own small related contracts/models such as `Note`, `NotesRepository`, and a narrower backup-oriented port where justified.
+`:domain:notes` may cohesively own `Note`, `NotesRepository`, and narrower ports such as a backup-oriented snapshot/read contract where justified.
 
-Do **not** create a generic `core:domain` dumping ground.
+Persistence implementation can remain in `core:database` initially; a future `:data:notes` extraction is evidence-driven, not precommitted.
 
-Do **not** introduce `:data:notes` merely to match a textbook diagram. Extract a data module only when transaction/storage ownership can be moved cleanly and the new module provides concrete change isolation.
+## 7. Documentation/file organization
 
-## 8. Documentation and file organization rule
+Optimize for **cohesion + reviewability**.
 
-Yonte optimizes for **cohesion and reviewability**, not one-responsibility-per-file literalism and not minimum file count.
+A file may contain two or three small responsibilities when they share owner, reviewer, authority, lifecycle, and normal reason to change.
 
-A file may contain two or three small responsibilities when they share:
+Split when concerns develop independent ownership/review/security risk or become difficult to understand safely.
 
-- the same architectural area.
-- the same owner/reviewer.
-- the same authority/lifecycle.
-- the same normal reason to change.
+Avoid both megafiles and fragmented micro-documents.
 
-Split when concerns develop independent ownership, independent review gates, different security/data risk, or the file becomes hard to understand safely.
+The Master Plan is a deliberate broader orientation document; focused rules remain in specialized docs/ADRs.
 
-Avoid both megafiles and fragmented micro-files.
+## 8. Data ownership and physical storage
 
-See `docs/DOCUMENTATION_STANDARD.md`.
-
-## 9. Data ownership and physical storage
-
-One encrypted physical Room database may contain tables owned by several bounded contexts. Shared physical storage does **not** mean shared ownership or unrestricted table access.
+One encrypted Room database may physically store multiple bounded contexts. Shared physical storage does not grant shared ownership.
 
 Rules:
 
-- each domain owns its schema semantics and repository contract.
-- Room entities/DAOs are persistence implementation, not UI/domain contracts.
-- presentation must not expose or depend on `@Entity`, DAO, SQLCipher, or raw SQL types.
-- cross-feature references use stable global identity/reference contracts, not another feature's entity class.
-- migrations are additive/safe where possible and never use destructive migration as a shortcut for user-owned data.
-- committed Room schema history and migration tests are required before schema evolution beyond the current baseline.
+- each domain owns schema semantics and repository contracts.
+- Room entities/DAOs/raw SQL/SQLCipher details are persistence implementation.
+- feature presentation/domain does not expose persistence entities.
+- no feature reads another feature's tables directly.
+- cross-feature references use stable identity/contracts.
+- migrations preserve user data; no destructive migration shortcut.
+- committed Room schemas + migration-test evidence are required before schema evolution.
 
-Current confirmed debt: Notes presentation still depends on `NoteEntity`; this is tracked for migration before the semantic guard is enabled.
+Current confirmed debt: Notes presentation still depends on `NoteEntity`; migrate it before enabling the semantic persistence guard (#7 then #6).
 
-See `docs/data/`, ADR-001/ADR-002, and issues #4/#7/#6.
+## 9. Global entity identity — data passports
 
-## 10. Global identity — "data passports"
+Global entity identity belongs to the **data/platform identity boundary**, not Security (ADR-001, ADR-010).
 
-Every durable cross-feature object should eventually have a stable identity independent of its persistence representation.
+A durable cross-feature reference may contain, where needed:
 
-Canonical identity concepts include, where needed:
-
-- stable entity ID.
+- globally stable entity ID.
 - semantic entity type.
-- owning/source bounded context.
+- owning/source domain.
 - owner/workspace/user context.
-- revision/version for conflict-safe writes.
-- creation/update metadata.
+- revision/version.
 - provenance/source reference.
-- lifecycle/sensitivity metadata where appropriate.
+- lifecycle/sensitivity metadata.
 
-The global registry/relationship layer should store identity and relationship metadata, not duplicate all protected feature content.
+The registry/relationship layer stores identity and relationship metadata, not duplicate protected feature content.
 
-Cross-feature relationships use references such as `EntityRef` and relation records rather than direct entity/table coupling.
+Cross-feature relationships use stable references instead of persistence classes.
 
-Revision checks support optimistic concurrency so AI or automation cannot silently overwrite newer user changes.
+Revision/version supports optimistic concurrency so stale AI/automation writes cannot silently overwrite newer user changes.
 
-See `docs/data/identity/ENTITY_IDENTITY.md`, ownership/provenance docs, and ADR-001.
+## 10. Integration model
 
-## 11. Integration contracts
-
-Yonte uses three distinct integration forms:
+Three integration forms remain distinct:
 
 - **Command** — explicit request to perform an action.
 - **Query** — explicit request for information.
-- **Event** — fact emitted after a state change has already completed.
+- **Event** — fact emitted after a state change completed.
 
-Use commands/queries for synchronous request-response behavior. Use events for fan-out and decoupled reactions.
+Commands/queries handle synchronous request-response behavior. Events handle fan-out/decoupled reactions.
 
-Do not use an event bus as a replacement for every call.
+Do not turn an Event Bus into the universal call mechanism.
 
-Critical reliable event delivery may use a transactional outbox only when atomicity between persisted domain change and event publication is genuinely required.
+Events carry references and non-sensitive metadata by default: **references, not secrets**.
 
-Events carry references and non-sensitive metadata by default ("references, not secrets"). Consumers retrieve protected content through the owning permissioned contract.
+Transactional outbox/idempotency is introduced only when atomic reliable delivery is genuinely required.
 
-See `docs/integration/` and ADR-003/ADR-004.
-
-## 12. Security doctrine
+## 11. Security doctrine
 
 Security is a platform authority, not a feature utility bag.
 
@@ -223,33 +206,87 @@ Stable invariants:
 - deny by default for sensitive capabilities.
 - least privilege / least capability.
 - no plaintext sensitive data at rest.
-- features do not receive raw master-key authority.
-- authentication, authorization, encryption/key wrapping, and action confirmation are separate concepts.
-- sensitive cross-feature/AI access requires policy and user intent.
-- failures are secure/fail-closed where security is involved.
-- security contracts remain stable while cryptographic implementations/parameters can evolve through versioned envelopes and migrations.
+- feature code never receives unconstrained master-key authority.
+- authentication, authorization, encryption/key wrapping, and action confirmation remain separate concepts.
+- security failure is fail-closed where appropriate.
+- crypto implementations/parameters may evolve only through versioned compatibility-aware migrations.
 
-Platform security capabilities may evolve into narrow services such as identity, authentication, authorization, key vault/crypto, privacy policy, audit, and update-trust verification. Avoid one omnipotent `SecurityManager` API.
+Security may own narrow services for **actor/session identity**, authentication, authorization policy, key vault/crypto, privacy policy, audit decision metadata, and update-trust verification.
 
-Current implementation strengths include SQLCipher, Argon2, Android Keystore wrapping, PIN/biometric unlock paths, and no plaintext database fallback.
+Security does **not** own global entity identity or every feature's capability vocabulary (ADR-010).
 
-Tracked hardening includes biometric enrollment secret lifetime (#3), KDF/secret memory hygiene, and update signer/package trust (#11).
+Each bounded context owns semantic capability/resource definitions; Security evaluates policy over stable identifiers/references.
 
-See `docs/security/` and ADR-007.
+Current strengths include SQLCipher, Argon2, Android Keystore wrapping, PIN/biometric unlock paths, and no plaintext DB fallback.
 
-## 13. AI architecture — central intelligence with governed access
+Current hardening priorities include:
 
-AI is expected to become one of Yonte's most connected and possibly most-used interfaces. Connectivity must be achieved through semantic contracts, not direct database access.
+- biometric async secret lifetime (#3).
+- candidate-key derivation vs authenticated-session commit (#15).
+- KDF secret-memory hygiene with compatibility proof (#16).
+- automatic-backup authority lifecycle (#14).
+- update signer/package trust (#11).
 
-Never design:
+## 12. Authentication and key lifecycle
+
+A candidate secret/key is not authenticated session state merely because it can be derived or unwrapped.
+
+Preferred passphrase flow:
+
+```text
+derive candidate
+ -> validate protected database/session
+ -> commit wrapped session key
+ -> publish authenticated/unlocked state
+```
+
+Purpose-specific key authority stays explicit:
+
+- active session cache.
+- PIN convenience cache.
+- biometric-gated cache.
+- automatic-backup background authority.
+- future portable recovery material.
+
+Do not collapse these into one interchangeable generic key cache.
+
+Temporary mutable key material is zeroed when ownership permits. Avoid creating extra secret copies without a demonstrated lifecycle need.
+
+## 13. Authorization and consent
+
+Authorization answers:
+
+`May actor A perform capability C on resource R now?`
+
+Security owns:
+
+- decision model (`ALLOW`, `DENY`, `CONFIRMATION_REQUIRED`).
+- policy/risk/sensitivity evaluation.
+- confirmation rules.
+- policy versioning.
+
+Bounded contexts own:
+
+- semantic capability vocabulary (for example Notes read/create/update/delete).
+- resource/business semantics.
+
+Global entity identity stays in the data/platform identity boundary.
+
+This separation is durable in ADR-010.
+
+## 14. AI architecture
+
+AI is intended to become deeply connected, but connectivity is through governed semantic contracts—not direct storage access.
+
+Never:
 
 ```text
 AI -> YonteDatabase
 AI -> notes/tasks tables
-feature ViewModel -> external AI provider directly
+Feature ViewModel -> external AI provider directly
 ```
 
-Preferred model:
+Preferred:
 
 ```text
 User
@@ -265,70 +302,59 @@ Feature-owned contracts
 Notes / Tasks / Calendar / Files ...
 ```
 
-AI may understand semantic types such as NOTE, TASK, EVENT, FILE. It must not know Room entities, DAOs, SQLCipher internals, or feature storage implementation.
+AI may understand NOTE/TASK/EVENT/FILE semantics, but not Room/DAO/SQLCipher implementation.
 
-AI reads normalized knowledge items only through permissioned gateways and executes writes through explicit commands/contracts with revision/conflict protection.
+Writes use explicit commands and revision/conflict checks.
 
-## 14. AI permissions and confirmations
+## 15. AI permission, context, memory, and privacy
 
-AI capabilities are controlled by the user from AI settings and are scoped per domain/operation.
+AI permissions are user-controlled per domain/operation.
 
-Examples:
-
-- Notes: read / create / update / delete.
-- Tasks: read / create / update / complete / delete.
-- Calendar: read / create / update / delete.
-- sensitive/files/financial domains may require just-in-time consent even when a broad feature capability exists.
-
-Authorization answers **"may AI perform this class of operation?"**
-
-Confirmation answers **"must this specific action be approved now?"**
-
-Policy direction:
+Authorization and confirmation are distinct:
 
 - ordinary permitted read/search/summarize may proceed.
-- explicit user command to create a low-risk item can be sufficient intent if creation capability is enabled.
-- modification of existing important data requires appropriate preview/confirmation based on impact.
+- explicit low-risk create may use the user's current command as sufficient intent when standing permission allows it.
+- meaningful modification may require preview/confirmation based on impact.
 - bulk modification requires confirmation.
-- deletion requires confirmation.
-- permanent deletion requires strong confirmation.
-- sensitive reads use just-in-time confirmation where required.
-- financial/security actions require elevated confirmation.
+- delete requires confirmation.
+- permanent delete requires strong confirmation.
+- sensitive read/external disclosure may require just-in-time consent.
+- financial/security/recovery actions require elevated confirmation.
 
-See `docs/ai/permissions/` and `docs/ai/actions/CONFIRMATION_POLICY.md`, ADR-005.
+Keep separate:
 
-## 15. AI context, memory, privacy, and derived data
+- **source data** — owned by originating domain.
+- **AI context** — temporary material for current operation.
+- **AI memory** — deliberately persisted AI-specific memory under explicit governance.
 
-Keep three concepts separate:
+Sensitive source content does not automatically become AI memory.
 
-- source data — owned by the originating feature.
-- AI context — temporary material supplied for the current operation.
-- AI memory — intentionally retained AI-specific memory under explicit governance.
+External provider handling must be described honestly; Yonte only guarantees local retention/reuse behavior it actually controls.
 
-Sensitive content is not copied into AI memory automatically.
-
-When external AI providers are used, Yonte must make the processing boundary clear and minimize content. Do not claim external-provider data is globally "deleted from AI memory" unless the provider contract actually proves that. Yonte can guarantee what it stores and reuses locally; provider handling follows the selected provider policy.
-
-Derived data such as summaries/embeddings/recommendations must retain source provenance/revision so it can be invalidated when the source is edited, deleted, or becomes inaccessible.
-
-See `docs/ai/context/`, `providers/`, and `derived/`.
+Derived summaries/embeddings/recommendations keep source provenance/revision so they can be invalidated.
 
 ## 16. Backup and disaster recovery
 
-Backup/recovery is a top-tier platform responsibility.
+Backup/recovery is top-tier platform infrastructure.
 
-Portable manual backup credentials must have explicit symmetric semantics. Current code has a known mismatch between an "independent backup passphrase" contract and manual export using the active app session key; this is tracked in #12 and must be resolved before claiming a portable recovery model.
+Manual portable backup and scheduled unattended backup share security/recovery laws but have different credential lifecycles.
 
-Target recovery model may separate:
+Current known issues:
 
-- a high-entropy Backup Master Key.
+- manual export contract says independent backup passphrase while current export uses active session-key lineage (#12).
+- automatic-backup key presence is not perfectly aligned with enabled/configured state (#14).
+- Worker currently constructs too much infrastructure and must become a thin OS adapter after policy/data dependencies are explicit (#10).
+
+Portable recovery target may eventually separate:
+
+- high-entropy Backup Master Key.
 - device-local Keystore wrapping for unattended backup.
-- a portable recovery capsule protected by a user recovery passphrase.
+- portable recovery capsule protected by user recovery passphrase.
 
-Restore must be staged and non-destructive to current live data until validation succeeds:
+Restore is staged and non-destructive:
 
 ```text
-backup file
+backup
  -> size/format validation
  -> authentication/decryption
  -> integrity verification
@@ -341,334 +367,312 @@ backup file
  -> commit
 ```
 
-On failure, live data remains untouched.
+Failure leaves live data untouched.
 
-Verified backup generations/last-known-good semantics are preferred over trusting the newest file merely because it exists.
+Support verified generations/last-known-good semantics when justified; do not trust "latest" merely because it exists.
 
-Required failure coverage includes corruption, wrong credential, interrupted write/restore, incompatible versions, missing key/Keystore reset, storage unavailable/full, FTS/index corruption, process death, and partial state.
+## 17. Errors and observability
 
-See `docs/backup/` and ADR-006.
+Failures cross boundaries as typed safe results rather than raw SQL/HTTP/crypto exceptions.
 
-## 17. Errors, failure handling, and observability
+Canonical failure metadata may include:
 
-Failures cross boundaries as typed domain/platform results rather than raw SQL/HTTP/crypto exceptions.
-
-A canonical failure may expose:
-
-- stable error code.
-- severity/category.
+- stable code/category.
+- severity.
 - retryability.
 - safe user action/message.
 - correlation ID.
-- structured non-sensitive metadata.
+- non-sensitive structured metadata.
 
-Unknown failures must preserve data, stop unsafe continuation, and produce privacy-safe diagnostics. They must never silently report success.
+Unknown failures preserve data and stop unsafe continuation.
 
-Operational traces/audit may include actor, entity reference, operation, permission used, result, timing, error code, and correlation ID — but not note bodies, passphrases, keys, tokens, or protected content.
-
-See `docs/platform/errors/` and `docs/platform/observability/`.
+Audit/observability may record actor, capability, entity reference, result, timing, error code, policy version, and correlation ID—but never bodies, passphrases, keys, tokens, or protected content.
 
 ## 18. Concurrency and consistency
 
-Important mutations define transaction boundaries and conflict behavior explicitly.
+Important mutations define transaction/conflict behavior explicitly.
 
-Use revision/version checks for optimistic concurrency where stale writes are possible, especially AI/automation flows.
+Use revision/version checks where stale writes are possible, especially AI/automation.
 
-Multi-step operations define atomicity or safe-abort/compensation behavior; do not rely on implicit callback order.
+Multi-step operations define atomicity or safe-abort/compensation; do not rely on callback ordering.
 
-Repeated event/background-job delivery should be idempotent where practical.
+Repeated event/background-job delivery is idempotent where practical.
 
-See `docs/data/consistency/`.
+## 19. Search, files, background work, time, resources
 
-## 19. Search, indexing, files, background work, and time
+Cross-cutting laws:
 
-Cross-cutting capabilities remain governed without forcing premature frameworks:
-
-- **Search/indexing:** feature content ownership remains local; shared search indexes must not become an unauthorized content store.
-- **Attachments/files:** owning domain controls semantics; sensitive files are encrypted and referenced by stable IDs rather than arbitrary filesystem paths.
-- **Background work:** WorkManager/OS adapters are thin triggers over high-level use cases; workers do not construct database/security/service graphs.
-- **Clock/time:** business rules use an injectable clock where deterministic behavior/testing matters; do not scatter uncontrolled `System.currentTimeMillis()` into long-lived domain policy.
-- **Performance/resource budgets:** battery, memory, background work, DB writes, and AI provider/token/cost budgets are considered at feature design time and measured where relevant.
-
-See `docs/platform/` and `docs/data/files/`.
+- **Search/indexing:** feature content ownership remains local; a shared index cannot become an unauthorized content store.
+- **Attachments/files:** owning domain controls semantics; protected files are encrypted and referenced by stable IDs.
+- **Background work:** WorkManager/OS callbacks are thin adapters over high-level jobs, not service/database/security composition roots.
+- **Clock/time:** injectable clocks are used where deterministic business/security policy matters; wall clock is not scattered through long-lived policy.
+- **Resources:** battery, memory, background work, DB writes, and future AI token/provider cost have explicit budgets when relevant.
 
 ## 20. Future sync readiness
 
-Yonte remains local-first and does not add sync merely to prepare for sync.
+Yonte stays local-first and does not add sync merely to prepare for sync.
 
-However, identity, revisioning, tombstones/lifecycle, provenance, and conflict semantics should avoid choices that make future sync impossible.
+Identity, revisions, tombstones/lifecycle, provenance, and conflict semantics should avoid choices that make future sync impossible.
 
-If sync is later introduced:
+If sync is later justified:
 
-- local database remains the primary user experience source of truth during offline operation.
-- sync is an explicit boundary/adapter.
+- local DB remains the offline user-experience source of truth.
+- sync is an explicit adapter/boundary.
 - server schema does not become the domain model by default.
-- conflict policy is domain-aware, not blind last-write-wins for all content.
+- conflict policy is domain-aware, not universal blind last-write-wins.
 
-See `docs/data/sync/SYNC_READINESS.md`.
+## 21. Release/update/rollout
 
-## 21. Release, update trust, and rollout
+Code rollback and persistent-data rollback are different problems.
 
-Release safety distinguishes code rollback from persistent-data rollback. They are not equivalent.
+Security/data migrations document compatibility before shipment.
 
-Security/data migrations must document compatibility with older/newer app versions before shipment.
+Update trust uses installed package identity/signing lineage as the local trust anchor; remote SHA is integrity evidence, not signer authority (ADR-009).
 
-Yonte update hardening must verify package identity and signer trust independently from mutable remote update metadata. Remote SHA remains download-integrity evidence, not the sole signer trust anchor.
+Feature flags may stage risky optional behavior but may never disable security/data-integrity invariants. Core local usability must not depend on a remote flag service.
 
-Feature flags may stage risky capabilities/UX, but may never disable security/data-integrity invariants. Flags need an owner, default, removal condition, and tests and must not require a remote service for basic local-first usability.
+## 22. Versioning
 
-See `docs/platform/release/RELEASE_GOVERNANCE.md` and issue #11.
-
-## 22. Versioning strategy
-
-Do not couple every evolution dimension to the app version.
-
-Maintain conceptually independent versions where applicable:
+Keep evolution dimensions conceptually independent where applicable:
 
 - App Version.
-- Database Schema Version.
+- DB Schema Version.
 - Contract Version.
 - Event Version.
 - Backup Format Version.
 - Security/Crypto Envelope or Policy Version.
 - AI Policy/Capability Version.
 
-Contract evolution follows expand -> migrate consumers -> deprecate -> remove where practical.
+Contracts evolve through expand -> migrate -> deprecate -> remove when practical.
 
-Crypto evolution uses versioned envelopes/metadata so new writes can use stronger policy while old protected material remains readable during controlled migration.
+Crypto evolution uses versioned envelopes/metadata with controlled compatibility migration.
 
-See `docs/architecture/constitution/EVOLUTION_AND_VERSIONING.md`.
+## 23. Testing and Definition of Done
 
-## 23. Testing and quality doctrine
+Compilation proves only compilation.
 
-Compilation is evidence of compilation only.
+Required evidence is layered:
 
-Yonte uses layered verification:
-
-- unit tests for deterministic domain rules/policies.
+- unit tests for deterministic rules/policies.
 - mapping/contract tests at boundaries.
 - integration tests for repositories/DI/critical adapters.
-- UI tests only where behavior cannot be proven at a narrower layer.
-- security tests for auth/key/permission/secret lifecycle.
-- migration tests for persistent schema evolution.
-- backup/recovery corruption and fault-injection tests.
-- architecture checks that make forbidden dependency/type leakage fail automatically after migration.
-- canonical GitHub Actions CI as repository verification evidence.
+- UI tests only where narrower layers cannot prove behavior.
+- security tests for authentication/key/permission/secret lifecycle.
+- Room migration tests for schema evolution.
+- backup/recovery corruption/fault tests.
+- semantic architecture guards after migration.
+- canonical GitHub Actions CI.
 
-Every high-impact confirmed defect receives focused regression coverage when technically practical.
+A high-impact defect gets focused regression coverage when technically practical.
 
-See `docs/platform/testing/QUALITY_GATES.md`.
+No Critical/High technical debt is accepted as silent "later cleanup". Any small accepted debt needs rationale, impact, removal condition, and tracked target.
 
 ## 24. Architecture enforcement
 
-Documentation is not enough. After a boundary is migrated, automated checks should make regression difficult to express.
+After a boundary is migrated, automated checks should make regression difficult to express.
 
-Target guard coverage includes:
+Target enforcement includes:
 
 - no feature -> feature implementation dependencies.
-- no feature -> app dependencies.
-- no core -> feature/app dependencies.
+- no feature -> app dependency.
+- no core -> feature/app dependency.
 - no Room/DAO/persistence entity leakage into feature presentation/domain.
-- no feature UI state based on `*Entity` persistence types.
-- no direct infrastructure construction in workers/UI where a high-level injected contract is required and reliably checkable.
+- no UI state based on persistence `*Entity` types.
+- no Worker/UI infrastructure graph construction where a high-level contract is required and reliably checkable.
 
-Important sequencing rule: **migrate first, enforce the new invariant immediately after/with the migration**. Do not intentionally break the baseline with a future-state guard before legitimate current code is migrated.
+**Migrate first, enforce immediately after/with the migration.** Do not intentionally make CI red with a future-state guard before legitimate current code is migrated.
 
-See issue #6.
+## 25. Agent/human governance
 
-## 25. Agent and human governance
+Every non-trivial change begins with inspection and a change-impact map covering:
 
-Every non-trivial change begins with repository inspection and a change-impact map covering ownership, files/modules, contracts, data/schema, security/privacy, events/AI permissions, backup compatibility, failures, tests, and rollback/safe-abort behavior.
+- ownership/modules/files.
+- contracts/dependencies.
+- data/schema/migration.
+- security/privacy/secrets.
+- events/AI permissions.
+- backup compatibility.
+- failures/tests/rollback or safe-abort.
 
-Scope is fenced. Crossing into security/database/backup/migrations/contracts/CI/release/another feature requires explicit justification and the applicable gate.
+Scope crossing security/database/backup/migrations/contracts/CI/release/another domain requires explicit justification and the applicable gate.
 
-No silent technical debt. Critical/high debt is not accepted as "later cleanup". Any small accepted debt must be tracked with rationale, impact, owner/removal condition, and target removal point.
+Current `AGENTS.md` requires independent implementer/reviewer/verifier roles for non-trivial software work. Future tool-agnostic governance (#13) may change the mechanism but must preserve independence/evidence and must never become a self-approval shortcut.
 
-Current `AGENTS.md` requires independent implementer/reviewer/verifier roles for non-trivial software work. A future governance improvement (#13) may make the mechanism tool-agnostic while preserving or strengthening independence/evidence requirements; it must not be used as a shortcut to self-approve sensitive changes.
+## 26. Execution roadmap — dependency gates
 
-## 26. Definition of architectural progress
-
-A change moves Yonte toward the target only if it produces at least one concrete improvement without unjustified cost, such as:
-
-- lower implementation coupling.
-- clearer domain ownership.
-- stronger security/privacy boundary.
-- safer data migration/recovery.
-- improved testability/observability.
-- smaller dependency surface.
-- better failure isolation.
-- more reliable compatibility/versioning.
-- reduced future change ripple.
-
-Moving code between folders without improving ownership or change isolation is not architectural progress.
-
-Adding abstractions/modules with no concrete independent reason to change is not architectural progress.
-
-## 27. Execution roadmap — dependency gates
-
-The roadmap is dependency-driven, not a rigid calendar.
+The roadmap is dependency-driven, not calendar-driven. Deferred items are re-evaluated whenever an adjacent boundary changes.
 
 ### Phase 0 — Baseline health
 
-Goal: trustworthy current baseline before broad refactors.
-
 - keep canonical CI green.
-- fix P0 correctness/security defects.
-- preserve user data and current behavior.
+- fix P0 biometric asynchronous secret lifetime (#3).
+- preserve user data/current behavior.
 
-Current principal blocker: #3 biometric enrollment asynchronous session-key lifetime.
+**Gate:** no broad runtime migration while a relevant P0 correctness/security defect or unexplained CI failure remains open.
 
-### Phase 1 — Governance and evolution-safety baseline
+### Phase 1 — Evolution-safety baseline
 
 - maintain ADRs/constitution/change gates/Definition of Done.
-- configure committed Room schema v1 baseline.
-- establish migration-test support before any DB version increment.
-- preserve known backup compatibility fixtures/round-trip evidence.
-- enforce only rules legitimate current architecture can satisfy.
+- commit Room schema v1 and migration-test support before any DB version increment (#4).
+- preserve backup compatibility fixtures/round-trip evidence.
+- enforce only rules the legitimate current architecture can satisfy.
 
-Principal tracked prerequisite: #4.
+### Phase 2 — Boundary, session, and composition hardening
 
-### Phase 2 — Boundary and composition hardening
+Execute by dependency, not merely issue number:
 
-- introduce Notes-owned domain contract boundary (`:domain:notes` preferred first step).
-- map persistence `NoteEntity <-> Note` internally.
-- remove Room/DAO/entity knowledge from Notes presentation.
-- remove unnecessary dependency surface after verified import analysis.
-- make Settings ViewModel lifecycle-owned (#8).
-- split Settings orchestration by cohesive responsibility without module explosion (#9).
-- thin ScheduledBackupWorker into an OS adapter over a high-level backup job (#10).
-- enable semantic architecture guards after each migrated boundary (#6).
+1. Notes domain/persistence boundary (#7 / ADR-008).
+2. candidate-key derivation vs authenticated-session commit (#15).
+3. Settings long-running operation owners (#9).
+4. Settings presentation lifecycle ownership after operation lifetimes are explicit (#8).
+5. automatic-backup key lifecycle correctness (#14).
+6. thin ScheduledBackupWorker after policy/data/key dependencies are explicit (#10).
+7. semantic architecture enforcement after each migrated boundary (#6).
 
-### Phase 3 — Backup and recovery hardening
+Independent safe work may move within this phase when its prerequisite is already satisfied.
 
-- resolve manual portable-backup credential semantics (#12).
-- implement staged restore safety.
-- verify backup generations/last-known-good behavior where justified.
-- formalize recovery-key lifecycle and backward-compatible backup-format evolution.
-- fault-test destructive/recovery paths.
+### Phase 3 — Backup/recovery hardening
 
-### Phase 4 — Global identity and relationships
+- explicit symmetric manual portable-backup credentials (#12).
+- staged restore safety.
+- verified generations/last-known-good where justified.
+- recovery-key lifecycle + versioned backward compatibility.
+- corruption/interruption/wrong-credential/incompatible-version/storage failure tests.
 
-- add stable entity references/revisions/provenance/ownership.
-- add relationship semantics without centralizing feature content.
-- use reviewed Room migrations backed by committed schemas/tests.
+### Phase 4 — Global identity/relationships
 
-### Phase 5 — Authorization and consent
+- stable entity references/revisions/provenance/ownership.
+- relation semantics without centralizing feature content.
+- reviewed Room migrations using committed schemas/tests.
 
-- implement user-owned per-feature AI capabilities.
-- separate authorization from action confirmation.
-- add resource/risk/sensitivity policy.
+### Phase 5 — Authorization/consent
 
-### Phase 6 — Commands, queries, and events
+- capability/resource/risk/sensitivity policy.
+- bounded contexts define semantic capability vocabulary; Security evaluates it (ADR-010).
+- user-owned AI permission persistence.
+- authorization remains separate from confirmation.
 
-- introduce typed integration contracts where cross-feature behavior requires them.
-- use events for completed facts/fan-out.
-- use transactional outbox/idempotency only where reliability requires it.
+### Phase 6 — Commands/queries/events
 
-### Phase 7 — AI platform integration
+- typed request/response contracts where integration requires them.
+- events for completed facts/fan-out.
+- transactional outbox/idempotency only where reliability requires it.
 
-- knowledge gateway.
-- action gateway.
-- capability registry.
-- provider boundary/privacy signaling.
-- context/memory separation.
-- provenance and derived-data invalidation.
-- revision/conflict-safe AI writes.
-- failure isolation so AI/provider failure never breaks core local features.
+### Phase 7 — AI platform
 
-### Cross-cutting hardening
+- knowledge/action gateways.
+- capability registry/discovery.
+- provider/privacy boundary.
+- context vs memory governance.
+- provenance/derived-data invalidation.
+- revision-safe writes.
+- provider failure isolation from core local functionality.
 
-Apply when the affected surface changes rather than waiting for a numbered phase:
+### Cross-cutting foundation work
 
-- update signer/package trust (#11).
-- security memory hygiene and crypto agility.
+Apply when safe and relevant rather than postponing by phase number:
+
+- installed-package/signing-lineage update trust (#11 / ADR-009).
+- KDF memory hygiene only after byte-for-byte compatibility vectors (#16).
+- PIN rate-limit clock hardening only after its clock/reboot threat model is explicit.
 - accessibility/localization/RTL.
 - resource/performance budgets.
-- release/rollback/feature rollout.
+- release/rollback/rollout.
 - secrets/config hygiene.
-- observability/privacy-safe audit.
+- privacy-safe observability/audit.
 
-See `docs/architecture/migration/MIGRATION_PHASES.md` for the authoritative phase gate wording.
+Authoritative detailed gate wording: `docs/architecture/migration/MIGRATION_PHASES.md`.
 
-## 28. Current tracked hardening register
+## 27. Current hardening register
 
-Operational issue state is authoritative on GitHub; this list records why each tracked item matters to the master plan.
+Live issue state on GitHub is authoritative. Current tracked foundation work includes:
 
-- #3 — P0 biometric enrollment async secret lifetime.
+- #3 — P0 biometric async secret lifetime.
 - #4 — Room schema export/migration-test baseline.
 - #6 — semantic architecture guard after boundary migration.
 - #7 — Notes domain/persistence decoupling.
-- #8 — lifecycle ownership for SettingsViewModel.
-- #9 — Settings responsibility decomposition without over-modularization.
-- #10 — thin ScheduledBackupWorker / high-level backup job boundary.
-- #11 — independent update signer/package trust validation.
-- #12 — explicit symmetric portable backup credentials.
-- #13 — tool-agnostic agent governance without weakening independent review.
+- #8 — Settings presentation lifecycle ownership.
+- #9 — Settings operation/responsibility decomposition.
+- #10 — thin ScheduledBackupWorker/high-level backup job.
+- #11 — independent update signer/package trust.
+- #12 — symmetric portable backup credentials.
+- #13 — tool-agnostic independent agent review governance.
+- #14 — automatic-backup key cache must match enabled/configured state.
+- #15 — separate candidate-key derivation from authenticated session commit.
+- #16 — remove immutable KDF secret copies with UTF-8 compatibility proof.
 
-Closed/completed issues remain in GitHub history; do not keep stale "current status" details here when operational state changes frequently.
-
-## 29. Decisions already accepted
-
-The following durable decisions are recorded in ADRs and summarized here:
+## 28. Accepted durable decisions
 
 - ADR-001 — global cross-feature entity identity/reference model.
-- ADR-002 — feature-owned data semantics/bounded-context ownership.
+- ADR-002 — bounded-context data ownership.
 - ADR-003 — commands/queries/events instead of implementation coupling.
-- ADR-004 — reliable events use idempotency/outbox only where needed.
-- ADR-005 — AI uses capability authorization plus risk-based confirmation.
-- ADR-006 — portable recovery and unattended device key wrapping are separate concerns.
-- ADR-007 — authentication, authorization, and key wrapping are distinct security boundaries.
+- ADR-004 — idempotency/outbox only where reliable event delivery requires it.
+- ADR-005 — capability-based AI authorization plus risk-based confirmation.
+- ADR-006 — unattended device wrapping and portable recovery are separate concerns.
+- ADR-007 — authentication, authorization, and key wrapping remain distinct.
+- ADR-008 — introduce `:domain:notes` first; defer `:data:notes` until it gives real isolation.
+- ADR-009 — installed package/signing lineage is the update trust anchor.
+- ADR-010 — Security owns authorization policy; data/platform owns global entity identity and bounded contexts own capability semantics.
 
-See `docs/architecture/decisions/README.md`.
+Index: `docs/architecture/decisions/README.md`.
 
-## 30. Decisions intentionally not made yet
+## 29. Intentionally deferred decisions
 
-Avoid prematurely freezing these choices until evidence requires them:
+These remain options until evidence changes the decision:
 
-- a `:data:<feature>` Gradle module for every domain.
-- server/cloud sync provider or account architecture.
+- `:data:<feature>` for every domain.
+- server/cloud sync provider/account architecture.
 - universal event sourcing.
-- one global content table for all features.
-- a generic all-powerful security manager.
-- a global generic domain module containing every feature model.
-- a microservice-style architecture inside the Android app.
-- a remote feature-flag dependency for core local behavior.
-- a specific external AI provider as permanent architecture.
+- one global content table.
+- generic all-powerful security manager.
+- global generic domain module containing every feature model.
+- microservice-style architecture inside Android.
+- remote feature-flag dependency for core local behavior.
+- permanent commitment to one external AI provider.
 
-These remain design options, not commitments.
+### Deferral review rule
 
-## 31. How this plan must be maintained
+A deferral is **not permanent**.
 
-A material product/architecture decision must not exist only in chat, a commit message, or an engineer's memory.
+At every related task ask:
 
-Update process:
+1. Has a new dependency made the deferred capability necessary now?
+2. Would implementing it now reduce total coupling/rework/risk?
+3. Can it be introduced safely with current tests/migration/recovery evidence?
+4. Does continuing to defer create hidden debt or force a knowingly wrong boundary?
 
-1. inspect current code/docs/ADRs first.
-2. if the change is a durable architecture decision, create or supersede an ADR.
-3. update this Master Plan when product destination, accepted architecture, dependency order, or major tracked work changes.
-4. update the focused authoritative doctrine/specification for implementation-level rules.
-5. keep operational status in Issues/PRs/CI rather than embedding volatile SHAs/runs here.
-6. remove or clearly mark obsolete documents so there is one discoverable path to current truth.
+If the answer shows the deferral is now harmful, promote the work. If implementing it would still be speculative architecture, keep it deferred and record why.
 
-## 32. Reviewer starting path
+## 30. Maintenance rule
 
-A new engineer should normally read in this order:
+A material final decision must not live only in chat, memory, or a commit message.
 
-1. `docs/YONTE_MASTER_PLAN.md` — destination and execution map.
-2. `docs/architecture/YONTE_CONSTITUTION.md` — non-negotiable architectural laws.
-3. `docs/architecture/decisions/README.md` — durable decisions and trade-offs.
-4. `docs/architecture/migration/MIGRATION_PHASES.md` — dependency gates.
-5. specialized area docs (`docs/security/`, `docs/backup/`, `docs/data/`, `docs/ai/`, `docs/integration/`, `docs/platform/`, `docs/design/`).
-6. current GitHub Issues/PR and actual code for live implementation state.
+Process:
 
-## 33. Final vision test
+1. inspect current code/docs/ADRs.
+2. create/supersede an ADR for durable architecture decisions.
+3. update this Master Plan when destination, accepted architecture, dependency order, or major tracked foundation work changes.
+4. update focused doctrine/specs for detailed rules.
+5. keep volatile operational status in Issues/PRs/CI.
+6. remove/redirect obsolete documents so there is one discoverable path to truth.
 
-Before approving a major change, ask:
+## 31. Reviewer starting path
 
-> Does this make Yonte more capable while keeping features independently evolvable, user data safer, security explicit, recovery trustworthy, and future AI deeply connected without gaining uncontrolled authority?
+1. `docs/YONTE_MASTER_PLAN.md`
+2. `docs/architecture/YONTE_CONSTITUTION.md`
+3. `docs/architecture/decisions/README.md`
+4. `docs/architecture/migration/MIGRATION_PHASES.md`
+5. specialized `docs/security/`, `docs/backup/`, `docs/data/`, `docs/ai/`, `docs/integration/`, `docs/platform/`, `docs/design/`.
+6. current Issues/PRs + actual code for live state.
 
-If the answer is no, the change should be redesigned even if it is faster to implement.
+## 32. Final vision test
 
-The target is not the maximum number of modules, documents, managers, or abstractions.
+Before approving a major change ask:
 
-The target is a platform that is **secure, cohesive, highly connected, low-coupled, reviewable, recoverable, and able to evolve for years without architecture collapse**.
+> Does this move Yonte toward a secure, recoverable, highly connected platform while keeping bounded contexts independently evolvable and preventing AI/platform infrastructure from gaining uncontrolled authority?
+
+If not, redesign it even if the alternative is faster.
+
+The target is not maximum modules, files, managers, or abstractions.
+
+The target is a platform that is **secure, cohesive, highly connected, low-coupled, reviewable, recoverable, productive to extend, and able to evolve for years without architecture collapse**.
