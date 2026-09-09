@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased — restore SettingsViewModel CI fixture contract (2026-09-09)
+
+- `feature/settings/src/test/.../SettingsViewModelTest.kt`: stub `LocalKeyManager.unlockMethod()` to the production default passphrase method in the shared fixture, preventing Mockito `null` from violating the non-null `SettingsUiState.unlockMethod` contract and allowing the existing backup-frequency tests to exercise their intended behavior. Production behavior is unchanged. (tracking: issue #2)
+
 ## Unreleased — TASK 25: Fix PIN main-thread freeze, biometric unlock stuck state, secure storage hardening (2026-09-08)
 
 - `app/.../MainViewModel.kt`: `submitPin()` now runs Argon2id KDF on `Dispatchers.Default`

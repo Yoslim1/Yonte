@@ -42,6 +42,7 @@ class SettingsViewModelTest {
         `when`(mockPrefs.edit()).thenReturn(mockEditor)
         `when`(mockEditor.putString(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString())).thenReturn(mockEditor)
         `when`(mockPrefs.getString(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any())).thenReturn(null)
+        `when`(mockLocalKeyManager.unlockMethod()).thenReturn(LocalKeyManager.METHOD_PASSPHRASE)
     }
 
     @Test
