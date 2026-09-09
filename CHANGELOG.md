@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — Run foundation PRs through Android CI (2026-09-09)
+
+- `.github/workflows/android.yml`: the pull-request trigger now covers
+  `architecture-foundation` alongside `main`, allowing Issue #3 fix head
+  `7970e82` to obtain the required canonical Android CI evidence without
+  changing any job, step, or check.
+
 ## Unreleased — P0: preserve biometric enrollment key until terminal callback (2026-09-09)
 
 - `app/.../BiometricEnrollmentOperation.kt`, `app/.../MainActivity.kt`: keep the
