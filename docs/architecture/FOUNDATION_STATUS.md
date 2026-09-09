@@ -19,11 +19,11 @@ Separate accepted target architecture from current production implementation so 
 
 The branch is still documentation-only. Production code remains inherited from `main` and has not yet been migrated to these target contracts.
 
-Known baseline blockers before broad refactoring:
+## Tracked baseline blockers
 
-1. `main` CI is red in `feature:settings` unit tests.
-2. biometric setup has a confirmed asynchronous session-key lifetime defect.
-3. Room schema export configuration is incomplete despite schema export being enabled.
+1. Issue #2 — restore green `feature:settings` unit-test baseline without weakening production contracts.
+2. Issue #3 — fix biometric enrollment asynchronous session-key lifetime and add regression coverage.
+3. Issue #4 — configure committed Room schema export/migration-test baseline before schema evolution.
 
 ## Gate
 
