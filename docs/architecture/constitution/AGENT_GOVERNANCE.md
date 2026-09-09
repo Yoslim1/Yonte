@@ -4,6 +4,8 @@
 
 Define additional architecture expectations for coding agents. `AGENTS.md` remains the execution-policy authority.
 
+Before implementation, classify the change using `../governance/CHANGE_CLASSIFICATION.md`. Completion must satisfy `../governance/DEFINITION_OF_DONE.md` and the applicable migration/change gate.
+
 ## Before non-trivial change
 
 Produce an impact map covering:
