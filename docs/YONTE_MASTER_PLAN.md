@@ -344,6 +344,7 @@ Current known issues:
 - manual export contract says independent backup passphrase while current export uses active session-key lineage (#12).
 - automatic-backup key presence is not perfectly aligned with enabled/configured state (#14).
 - Worker currently constructs too much infrastructure and must become a thin OS adapter after policy/data dependencies are explicit (#10).
+- current restore does not yet enforce the full version-aware staged/conflict-safe pipeline required by policy (#18).
 
 Portable recovery target may eventually separate:
 
@@ -534,7 +535,7 @@ Independent safe work may move within this phase when its prerequisite is alread
 ### Phase 3 — Backup/recovery hardening
 
 - explicit symmetric manual portable-backup credentials (#12).
-- staged restore safety.
+- version-aware staged restore with semantic validation, explicit conflict planning, atomic apply, and post-restore verification (#18).
 - verified generations/last-known-good where justified.
 - recovery-key lifecycle + versioned backward compatibility.
 - corruption/interruption/wrong-credential/incompatible-version/storage failure tests.
@@ -583,6 +584,12 @@ Apply when safe and relevant rather than postponing by phase number:
 
 Authoritative detailed gate wording: `docs/architecture/migration/MIGRATION_PHASES.md`.
 
+### Foundation completion gate
+
+Issue #17 is the live completion gate for the current project direction. No new product domain/service starts until the shared platform foundation is reviewably ready, unless the user explicitly changes that gate.
+
+A green build alone does not satisfy foundation completion. Remaining items must either be implemented and verified or explicitly reviewed and accepted as not required for the foundation with rationale recorded in the repository.
+
 ## 27. Current hardening register
 
 Live issue state on GitHub is authoritative. Current tracked foundation work includes:
@@ -600,6 +607,8 @@ Live issue state on GitHub is authoritative. Current tracked foundation work inc
 - #14 — automatic-backup key cache must match enabled/configured state.
 - #15 — separate candidate-key derivation from authenticated session commit.
 - #16 — remove immutable KDF secret copies with UTF-8 compatibility proof.
+- #17 — live foundation completion gate before any new product domain/service.
+- #18 — version-aware staged/conflict-safe restore with post-restore verification.
 
 ## 28. Accepted durable decisions
 
