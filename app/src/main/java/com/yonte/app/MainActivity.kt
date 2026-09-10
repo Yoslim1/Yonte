@@ -62,6 +62,7 @@ class MainActivity : FragmentActivity() {
     private var darkTheme by mutableStateOf(false)
     private var showSettings by mutableStateOf(false)
     private var isUnlocking by mutableStateOf(false)
+    private var biometricPrompt: BiometricPrompt? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -147,17 +148,19 @@ class MainActivity : FragmentActivity() {
         resources.configuration.layoutDirection == android.util.LayoutDirection.RTL
 
     private fun launchBiometricPrompt() {
+        val attemptId = viewModel.beginBiometricUnlock()
         viewModel.clearUnlockError()
         val executor = ContextCompat.getMainExecutor(this)
         val callback = object : BiometricPrompt.AuthenticationCallback() {
             override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                 super.onAuthenticationSucceeded(result)
+                biometricPrompt = null
                 try {
                     val cryptoCipher = result.cryptoObject?.cipher
                     if (cryptoCipher != null) {
                         try {
                             val sessionKey = biometricUnlockManager.unwrapSessionKey(cryptoCipher)
-                            viewModel.handleBiometricUnlockSuccess(sessionKey)
+                            viewModel.handleBiometricUnlockSuccess(sessionKey, attemptId)
                         } catch (_: Exception) {
                             // Decryption failed (missing or corrupted cache) — fall back
                             biometricUnlockManager.clearEnrolledKey()
@@ -167,7 +170,7 @@ class MainActivity : FragmentActivity() {
                             viewModel.switchToPinOrPassphrase()
                         }
                     } else {
-                        viewModel.handleBiometricUnlockFailure(isArabic())
+                        viewModel.handleBiometricUnlockFailure(isArabic(), attemptId)
                     }
                 } catch (_: Exception) {
                     viewModel.handleBiometricUnlockFailure(isArabic())
@@ -176,7 +179,8 @@ class MainActivity : FragmentActivity() {
 
             override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                 super.onAuthenticationError(errorCode, errString)
-                viewModel.handleBiometricUnlockError(errorCode, errString)
+                biometricPrompt = null
+                viewModel.handleBiometricUnlockError(errorCode, errString, attemptId)
             }
         }
 
@@ -189,7 +193,8 @@ class MainActivity : FragmentActivity() {
         val cipher = biometricUnlockManager.buildDecryptCipher()
         if (cipher != null) {
             try {
-                BiometricPrompt(this, executor, callback).authenticate(
+                biometricPrompt = BiometricPrompt(this, executor, callback)
+                biometricPrompt?.authenticate(
                     promptInfo,
                     BiometricPrompt.CryptoObject(cipher),
                 )
@@ -203,7 +208,8 @@ class MainActivity : FragmentActivity() {
                     )
                     viewModel.switchToPinOrPassphrase()
                 } else {
-                    viewModel.handleBiometricUnlockFailure(isArabic())
+                    biometricPrompt = null
+                    viewModel.handleBiometricUnlockFailure(isArabic(), attemptId)
                 }
             }
         } else {
@@ -342,6 +348,13 @@ class MainActivity : FragmentActivity() {
                 onOpenSettings = { showSettings = true },
             )
         }
+    }
+
+    override fun onDestroy() {
+        biometricPrompt?.cancelAuthentication()
+        biometricPrompt = null
+        viewModel.invalidateSession()
+        super.onDestroy()
     }
 
     override fun onNewIntent(intent: Intent) {
