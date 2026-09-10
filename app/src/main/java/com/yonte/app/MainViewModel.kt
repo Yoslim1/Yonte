@@ -88,13 +88,17 @@ internal class MainViewModel @Inject constructor(
     }
 
     fun submitPassphrase(passphrase: CharArray, isUnlocking: Boolean, isArabic: Boolean, onUnlockStarted: () -> Unit, onUnlockFinished: () -> Unit) {
-        if (isUnlocking) return
+        if (isUnlocking) {
+            passphrase.fill('\u0000')
+            return
+        }
         onUnlockStarted()
         _uiState.update { it.copy(unlockErrorMessage = null) }
         val generation = ++lifecycleGeneration
         authenticationJob?.cancel()
         authenticationJob = viewModelScope.launch {
             val chars = passphrase.copyOf()
+            passphrase.fill('\u0000')
             var candidateKey: ByteArray? = null
             try {
                 candidateKey = withContext(Dispatchers.Default) {
