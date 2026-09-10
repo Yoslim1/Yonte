@@ -13,6 +13,7 @@ import com.yonte.feature.onboarding.PinFieldMode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,6 +36,7 @@ internal class MainViewModel @Inject constructor(
     private var pinSubmissionInFlight = false
 
     private var warmDatabase: (suspend () -> Unit)? = null
+    private var databaseWarmJob: Job? = null
 
     fun setDatabaseWarmer(warmer: suspend () -> Unit) {
         warmDatabase = warmer
@@ -259,8 +261,9 @@ internal class MainViewModel @Inject constructor(
     }
 
     fun onUnlocked() {
+        databaseWarmJob?.cancel()
         _uiState.update { it.copy(unlocked = true, isWarmingDatabase = true) }
-        viewModelScope.launch {
+        databaseWarmJob = viewModelScope.launch {
             val result = try {
                 withContext(Dispatchers.IO) {
                     warmDatabase?.invoke()
@@ -299,6 +302,25 @@ internal class MainViewModel @Inject constructor(
         }
     }
 
+    /** Invalidates the interactive session and cancels any pending database warm. */
+    fun invalidateSession() {
+        databaseWarmJob?.cancel()
+        databaseWarmJob = null
+        YonteDatabase.close()
+        localKeyManager.clearSessionCache()
+        _uiState.update {
+            it.copy(
+                unlocked = false,
+                isWarmingDatabase = false,
+                unlockScreen = when (localKeyManager.unlockMethod()) {
+                    LocalKeyManager.METHOD_PIN -> MainUiState.UnlockScreen.PIN
+                    LocalKeyManager.METHOD_BIOMETRIC -> MainUiState.UnlockScreen.BIOMETRIC
+                    else -> MainUiState.UnlockScreen.PASSPHRASE
+                },
+                unlockErrorMessage = null,
+            )
+        }
+    }
     fun choosePinCreate() {
         _uiState.update {
             it.copy(pinMode = PinFieldMode.CREATE, unlockScreen = MainUiState.UnlockScreen.PIN)
@@ -339,6 +361,7 @@ internal class MainViewModel @Inject constructor(
     }
 
     override fun onCleared() {
+        databaseWarmJob?.cancel()
         super.onCleared()
         createdPin?.fill('\u0000')
         createdPin = null
