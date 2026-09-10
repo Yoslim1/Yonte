@@ -358,7 +358,7 @@ internal class MainViewModel @Inject constructor(
         _uiState.update { it.copy(unlockErrorMessage = null) }
     }
 
-    fun onUnlocked() {
+    fun onUnlocked() = synchronized(lifecycleLock) {
         val generation = ++lifecycleGeneration
         activeBiometricAttemptId = null
         databaseWarmJob?.cancel()
