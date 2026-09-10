@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — P0: close lifecycle review findings (2026-09-10)
+
+- `app/.../MainActivity.kt`: force the database warmer to execute a protected query so SQLCipher opening and migration failures are observed before the app remains unlocked.
+- `app/.../MainViewModel.kt`: guard authentication and warming jobs with a lifecycle generation, cancel stale work during invalidation, and prevent a late job from clearing a newer session.
+- `core/database/.../NoteRepository.kt`, `app/.../YonteAppModule.kt`: resolve the Hilt repository against the active database singleton so lock/unlock can safely close and reopen the protected database.
+- `app/.../MainViewModelTest.kt`, `.github/workflows/android.yml`: correct the app test fixture/assertion and include `:app:test` in CI. (implementation commits: 4e620ff, d3e9922, cdf5ae7, 0a9bd30, 17b664d, 13276f7)
+
 ## Unreleased — P0: harden session key ownership and cleanup (2026-09-10)
 
 - `app/.../MainViewModel.kt`: derive passphrase candidates without caching them before protected database validation; clear candidate, PIN, and backup key buffers on completion; fail closed on database warm failures; and add explicit session invalidation that closes the database and clears the interactive cache.
