@@ -116,7 +116,7 @@ internal class MainViewModel @Inject constructor(
                     YonteDatabase.close()
                     localKeyManager.clearSessionCache()
                 }
-                throw e
+                return@launch
             } catch (e: Exception) {
                 if (generation != lifecycleGeneration) return@launch
                 YonteDatabase.close()
