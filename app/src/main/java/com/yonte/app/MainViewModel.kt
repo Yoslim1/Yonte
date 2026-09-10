@@ -154,12 +154,15 @@ internal class MainViewModel @Inject constructor(
         }
     }
 
-    fun submitPin(pin: CharArray, isArabic: Boolean) {
-        if (pinSubmissionInFlight) { pin.fill('\u0000'); return }
+    fun submitPin(pin: CharArray, isArabic: Boolean): Job? {
+        if (pinSubmissionInFlight) {
+            pin.fill('\u0000')
+            return null
+        }
         pinSubmissionInFlight = true
         val chars = pin.copyOf()
         pin.fill('\u0000')
-        pinSubmissionJob = viewModelScope.launch {
+        val job = viewModelScope.launch {
             try {
                 withContext(Dispatchers.Default) {
                     _uiState.update { it.copy(unlockErrorMessage = null) }
@@ -244,6 +247,8 @@ internal class MainViewModel @Inject constructor(
                 pinSubmissionInFlight = false
             }
         }
+        pinSubmissionJob = job
+        return job
     }
 
     fun handleBiometricUnlockSuccess(sessionKey: ByteArray) {
