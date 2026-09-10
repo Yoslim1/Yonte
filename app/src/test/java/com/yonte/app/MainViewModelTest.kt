@@ -74,6 +74,27 @@ class MainViewModelTest {
     }
 
     @Test
+    fun `multiple PIN attempts leave the latest result authoritative`() = runTest {
+        val viewModel = createViewModel()
+        val firstPin = charArrayOf('1', '1', '1', '1')
+        val secondPin = charArrayOf('2', '2', '2', '2')
+
+        `when`(mockAppPinManager.lockoutSecondsRemaining()).thenReturn(0L)
+        `when`(mockAppPinManager.verify(org.mockito.ArgumentMatchers.any(CharArray::class.java)))
+            .thenReturn(false, true)
+        `when`(mockLocalKeyManager.cachedPinUnlockKey()).thenReturn(byteArrayOf(1, 2, 3, 4))
+
+        viewModel.submitPin(firstPin, isArabic = false)
+        advanceUntilIdle()
+        assertFalse(viewModel.uiState.value.unlocked)
+
+        viewModel.submitPin(secondPin, isArabic = false)
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.unlocked)
+        assertFalse(viewModel.uiState.value.isWarmingDatabase)
+    }
+
+    @Test
     fun `PIN verify failure with lockout produces expected remaining seconds`() = runTest {
         val viewModel = createViewModel()
         val pin = charArrayOf('1', '2', '3', '4')
