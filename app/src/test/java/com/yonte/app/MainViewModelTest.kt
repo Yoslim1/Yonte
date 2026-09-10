@@ -84,6 +84,7 @@ class MainViewModelTest {
         assertTrue(validated)
         assertFalse(committedBeforeValidation)
         assertTrue(validatingViewModel.uiState.value.unlocked)
+        assertTrue(candidate.all { it == 0.toByte() })
     }
 
     @Test
@@ -131,6 +132,22 @@ class MainViewModelTest {
         } finally {
             Dispatchers.resetMain()
         }
+    }
+
+    @Test
+    fun `biometric candidate validation failure never commits session`() = runTest {
+        val viewModel = createViewModel(
+            ProtectedDatabaseValidator { throw IllegalStateException("wrong biometric key") },
+        )
+        val attemptId = viewModel.beginBiometricUnlock()
+        val sessionKey = byteArrayOf(6, 5, 4, 3)
+
+        val job = viewModel.handleBiometricUnlockSuccess(sessionKey, attemptId)
+        job?.join()
+
+        assertFalse(viewModel.uiState.value.unlocked)
+        assertFalse(hasInvocation("cacheSessionKeyDirectly"))
+        assertTrue(sessionKey.all { it == 0.toByte() })
     }
 
     @Test
