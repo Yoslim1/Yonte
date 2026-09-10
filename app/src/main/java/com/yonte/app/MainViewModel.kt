@@ -37,6 +37,8 @@ internal class MainViewModel @Inject constructor(
 
     private var warmDatabase: (suspend () -> Unit)? = null
     private var databaseWarmJob: Job? = null
+    private var authenticationJob: Job? = null
+    @Volatile private var lifecycleGeneration = 0L
 
     fun setDatabaseWarmer(warmer: suspend () -> Unit) {
         warmDatabase = warmer
@@ -86,7 +88,9 @@ internal class MainViewModel @Inject constructor(
         if (isUnlocking) return
         onUnlockStarted()
         _uiState.update { it.copy(unlockErrorMessage = null) }
-        viewModelScope.launch {
+        val generation = ++lifecycleGeneration
+        authenticationJob?.cancel()
+        authenticationJob = viewModelScope.launch {
             val chars = passphrase.copyOf()
             var candidateKey: ByteArray? = null
             try {
@@ -99,6 +103,7 @@ internal class MainViewModel @Inject constructor(
                     val key = candidateKey ?: error("No candidate key after derivation")
                     YonteDatabase.get(appContext, key).noteDao().getAll()
                 }
+                check(generation == lifecycleGeneration) { "Session invalidated during authentication" }
                 val validatedKey = candidateKey ?: error("No candidate key after validation")
                 localKeyManager.cacheSessionKeyDirectly(validatedKey)
                 candidateKey.fill(0)
@@ -107,10 +112,13 @@ internal class MainViewModel @Inject constructor(
                 onUnlocked()
                 refreshAutoBackupKeyCacheIfEnabled()
             } catch (e: kotlinx.coroutines.CancellationException) {
-                YonteDatabase.close()
-                localKeyManager.clearSessionCache()
+                if (generation == lifecycleGeneration) {
+                    YonteDatabase.close()
+                    localKeyManager.clearSessionCache()
+                }
                 throw e
             } catch (e: Exception) {
+                if (generation != lifecycleGeneration) return@launch
                 YonteDatabase.close()
                 localKeyManager.clearSessionCache()
                 if (isDatabaseVersionMismatch(e)) {
@@ -262,6 +270,7 @@ internal class MainViewModel @Inject constructor(
 
     fun onUnlocked() {
         databaseWarmJob?.cancel()
+        val generation = lifecycleGeneration
         _uiState.update { it.copy(unlocked = true, isWarmingDatabase = true) }
         databaseWarmJob = viewModelScope.launch {
             val result = try {
@@ -270,12 +279,15 @@ internal class MainViewModel @Inject constructor(
                 }
                 Result.success(Unit)
             } catch (e: kotlinx.coroutines.CancellationException) {
-                YonteDatabase.close()
-                localKeyManager.clearSessionCache()
+                if (generation == lifecycleGeneration) {
+                    YonteDatabase.close()
+                    localKeyManager.clearSessionCache()
+                }
                 throw e
             } catch (e: Exception) {
                 Result.failure<Unit>(e)
             }
+            if (generation != lifecycleGeneration) return@launch
             val failure = result.exceptionOrNull()
             if (failure != null) {
                 YonteDatabase.close()
@@ -304,6 +316,8 @@ internal class MainViewModel @Inject constructor(
 
     /** Invalidates the interactive session and cancels any pending database warm. */
     fun invalidateSession() {
+        lifecycleGeneration++
+        authenticationJob?.cancel()
         databaseWarmJob?.cancel()
         databaseWarmJob = null
         YonteDatabase.close()
@@ -361,6 +375,8 @@ internal class MainViewModel @Inject constructor(
     }
 
     override fun onCleared() {
+        lifecycleGeneration++
+        authenticationJob?.cancel()
         databaseWarmJob?.cancel()
         super.onCleared()
         createdPin?.fill('\u0000')
