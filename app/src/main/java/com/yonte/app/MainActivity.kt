@@ -219,42 +219,46 @@ class MainActivity : FragmentActivity() {
     private fun launchBiometricSetupPrompt(onResult: (Boolean) -> Unit) {
         val sessionKey = localKeyManager.cachedSessionKey()
         if (sessionKey == null) { onResult(false); return }
-        val executor = ContextCompat.getMainExecutor(this)
-        val callback = object : BiometricPrompt.AuthenticationCallback() {
-            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                super.onAuthenticationSucceeded(result)
-                var success = false
-                try {
-                    val cipher = result.cryptoObject?.cipher
-                    if (cipher != null) {
-                        biometricUnlockManager.persistEncryptedKey(cipher, sessionKey)
-                        success = true
-                    }
-                } catch (_: Exception) {
-                } finally {
-                    sessionKey.fill(0)
-                }
-                onResult(success)
-            }
-
-            override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                super.onAuthenticationError(errorCode, errString)
-                sessionKey.fill(0)
-                onResult(false)
-            }
-        }
-        val promptInfo = BiometricPrompt.PromptInfo.Builder()
-            .setTitle(if (isArabic()) "تأكيد البصمة" else "Confirm fingerprint")
-            .setSubtitle(if (isArabic()) "لإعداد الفتح بالبصمة" else "To set up fingerprint unlock")
-            .setNegativeButtonText(if (isArabic()) "إلغاء" else "Cancel")
-            .build()
+        val operation = BiometricEnrollmentOperation(sessionKey, onResult)
         try {
+            val executor = ContextCompat.getMainExecutor(this)
+            val callback = object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    try {
+                        super.onAuthenticationSucceeded(result)
+                        operation.succeed { key ->
+                            val cipher = result.cryptoObject?.cipher
+                                ?: error("Biometric enrollment returned no cipher")
+                            biometricUnlockManager.persistEncryptedKey(cipher, key)
+                        }
+                    } catch (_: Exception) {
+                        operation.fail()
+                    }
+                }
+
+                override fun onAuthenticationFailed() {
+                    super.onAuthenticationFailed()
+                    // A failed attempt is non-terminal; keep the session key for
+                    // the next authentication attempt.
+                }
+
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    try {
+                        super.onAuthenticationError(errorCode, errString)
+                    } finally {
+                        operation.fail()
+                    }
+                }
+            }
+            val promptInfo = BiometricPrompt.PromptInfo.Builder()
+                .setTitle(if (isArabic()) "تأكيد البصمة" else "Confirm fingerprint")
+                .setSubtitle(if (isArabic()) "لإعداد الفتح بالبصمة" else "To set up fingerprint unlock")
+                .setNegativeButtonText(if (isArabic()) "إلغاء" else "Cancel")
+                .build()
             val cipher = biometricUnlockManager.buildEncryptCipher()
             BiometricPrompt(this, executor, callback).authenticate(promptInfo, BiometricPrompt.CryptoObject(cipher))
         } catch (_: Exception) {
-            onResult(false)
-        } finally {
-            sessionKey.fill(0)
+            operation.fail()
         }
     }
 
