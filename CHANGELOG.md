@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — P0: complete key lifecycle cleanup paths (2026-09-10)
+
+- `app/.../MainViewModel.kt`: clear onboarding return values, track and cancel PIN submissions, isolate each unlock warm operation by lifecycle generation, close the protected database on ViewModel teardown, and clear pending PIN state during invalidation.
+- `app/.../YonteAppModule.kt`: clear the database provider's caller-owned session-key buffer after database acquisition.
+- `app/src/test/.../MainViewModelTest.kt`: install a test Main dispatcher so asynchronous unlock lifecycle tests run deterministically. (implementation commits: 705994d, 57c2ced, 6ab2c19, d9caada, 491dd6d, 6ccee05)
+
 ## Unreleased — P0: close lifecycle review findings (2026-09-10)
 
 - `app/.../MainActivity.kt`: force the database warmer to execute a protected query so SQLCipher opening and migration failures are observed before the app remains unlocked.
