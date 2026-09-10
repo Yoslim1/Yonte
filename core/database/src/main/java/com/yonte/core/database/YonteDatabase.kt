@@ -32,19 +32,17 @@ abstract class YonteDatabase : RoomDatabase() {
                 return current
             }
 
-            current?.close()
-            instance = null
-            instanceKeyDigest = null
-
+            // Open the replacement before touching the current singleton. A wrong
+            // direct candidate must leave an already-valid database available.
             val database = build(context.applicationContext, passphraseKey.copyOf())
             try {
-                // Force SQLCipher/Room to open before publishing the singleton. A
-                // wrong key must fail while no process-level instance is visible.
                 database.openHelper.writableDatabase
             } catch (e: Exception) {
                 database.close()
                 throw e
             }
+
+            current?.close()
             instance = database
             instanceKeyDigest = keyDigest
             database
