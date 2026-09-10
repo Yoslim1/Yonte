@@ -65,6 +65,7 @@ class MainViewModelTest {
         `when`(mockLocalKeyManager.cachedPinUnlockKey()).thenReturn(fakeKey)
 
         viewModel.submitPin(pin, isArabic = false)
+        advanceUntilIdle()
 
         val state = viewModel.uiState.value
         assertNull(state.unlockErrorMessage)
@@ -73,7 +74,7 @@ class MainViewModelTest {
     }
 
     @Test
-    fun `PIN verify failure with lockout produces expected remaining seconds`() {
+    fun `PIN verify failure with lockout produces expected remaining seconds`() = runTest {
         val viewModel = createViewModel()
         val pin = charArrayOf('1', '2', '3', '4')
 
@@ -82,6 +83,7 @@ class MainViewModelTest {
         `when`(mockAppPinManager.lockoutSecondsRemaining()).thenReturn(25L)
 
         viewModel.submitPin(pin, isArabic = false)
+        advanceUntilIdle()
 
         val state = viewModel.uiState.value
         assertEquals("Wait 25 seconds", state.unlockErrorMessage)
@@ -89,7 +91,7 @@ class MainViewModelTest {
     }
 
     @Test
-    fun `PIN verify failure without lockout shows wrong PIN`() {
+    fun `PIN verify failure without lockout shows wrong PIN`() = runTest {
         val viewModel = createViewModel()
         val pin = charArrayOf('1', '2', '3', '4')
 
@@ -104,7 +106,7 @@ class MainViewModelTest {
     }
 
     @Test
-    fun `PIN verify failure with lockout shows Arabic message`() {
+    fun `PIN verify failure with lockout shows Arabic message`() = runTest {
         val viewModel = createViewModel()
         val pin = charArrayOf('1', '2', '3', '4')
 
@@ -113,13 +115,14 @@ class MainViewModelTest {
         `when`(mockAppPinManager.lockoutSecondsRemaining()).thenReturn(15L)
 
         viewModel.submitPin(pin, isArabic = true)
+        advanceUntilIdle()
 
         val state = viewModel.uiState.value
         assertEquals("انتظر 15 ثانية", state.unlockErrorMessage)
     }
 
     @Test
-    fun `PIN verify success with missing pin unlock key falls back to passphrase`() {
+    fun `PIN verify success with missing pin unlock key falls back to passphrase`() = runTest {
         val viewModel = createViewModel()
         val pin = charArrayOf('1', '2', '3', '4')
 
@@ -135,7 +138,7 @@ class MainViewModelTest {
     }
 
     @Test
-    fun `PIN lockout before verify shows wait message`() {
+    fun `PIN lockout before verify shows wait message`() = runTest {
         val viewModel = createViewModel()
         val pin = charArrayOf('1', '2', '3', '4')
 
@@ -149,7 +152,7 @@ class MainViewModelTest {
     }
 
     @Test
-    fun `clearUnlockError clears error message`() {
+    fun `clearUnlockError clears error message`() = runTest {
         val viewModel = createViewModel()
         val pin = charArrayOf('1', '2', '3', '4')
 
@@ -158,6 +161,7 @@ class MainViewModelTest {
         `when`(mockAppPinManager.lockoutSecondsRemaining()).thenReturn(10L)
 
         viewModel.submitPin(pin, isArabic = false)
+        advanceUntilIdle()
         assertNotNull(viewModel.uiState.value.unlockErrorMessage)
 
         viewModel.clearUnlockError()
