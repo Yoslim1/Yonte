@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — P0: harden session key ownership and cleanup (2026-09-10)
+
+- `app/.../MainViewModel.kt`: derive passphrase candidates without caching them before protected database validation; clear candidate, PIN, and backup key buffers on completion; fail closed on database warm failures; and add explicit session invalidation that closes the database and clears the interactive cache.
+- `core/security/.../LocalKeyManager.kt`: `unlock()` now derives a caller-owned candidate without committing it to session state.
+- `app/src/test/.../MainViewModelTest.kt`, `core/security/src/test/.../LocalKeyManagerTest.kt`: add coverage for failed database warming, session invalidation, and uncommitted candidate keys. (implementation commits: a80243b, 766a702, 0df51f3, bffcb04)
+
 ## Unreleased — Run foundation PRs through Android CI (2026-09-09)
 
 - `.github/workflows/android.yml`: the pull-request trigger now covers
