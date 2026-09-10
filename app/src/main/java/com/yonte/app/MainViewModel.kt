@@ -35,6 +35,7 @@ internal class MainViewModel @Inject constructor(
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
     private var createdPin: CharArray? = null
     private var pinSubmissionInFlight = false
+    private val lifecycleLock = Any()
 
     private var warmDatabase: (suspend () -> Unit)? = null
     private var databaseWarmJob: Job? = null
@@ -118,14 +119,16 @@ internal class MainViewModel @Inject constructor(
                     localKeyManager.unlock(chars)
                 }
                 validateCandidate(candidateKey ?: error("No candidate key after derivation"))
-                check(generation == lifecycleGeneration) { "Session invalidated during authentication" }
-                val validatedKey = candidateKey ?: error("No candidate key after validation")
-                localKeyManager.cacheSessionKeyDirectly(validatedKey)
-                validatedKey.fill(0)
-                candidateKey = null
-                _uiState.update { it.copy(unlockScreen = null) }
-                refreshAutoBackupKeyCacheIfEnabled()
-                onUnlocked()
+                synchronized(lifecycleLock) {
+                    check(generation == lifecycleGeneration) { "Session invalidated during authentication" }
+                    val validatedKey = candidateKey ?: error("No candidate key after validation")
+                    localKeyManager.cacheSessionKeyDirectly(validatedKey)
+                    validatedKey.fill(0)
+                    candidateKey = null
+                    _uiState.update { it.copy(unlockScreen = null) }
+                    refreshAutoBackupKeyCacheIfEnabled()
+                    onUnlocked()
+                }
             } catch (_: CancellationException) {
                 if (generation == lifecycleGeneration) {
                     failClosed(generation)
@@ -233,19 +236,13 @@ internal class MainViewModel @Inject constructor(
                             }
                             try {
                                 validateCandidate(pinUnlockKey)
-                                if (!isCurrentPinAttempt(generation, attemptId)) return@withContext
-                                localKeyManager.cacheSessionKeyDirectly(pinUnlockKey)
-                                if (!isCurrentPinAttempt(generation, attemptId)) {
-                                    localKeyManager.clearSessionCache()
-                                    return@withContext
+                                synchronized(lifecycleLock) {
+                                    if (!isCurrentPinAttempt(generation, attemptId)) return@withContext
+                                    localKeyManager.cacheSessionKeyDirectly(pinUnlockKey)
+                                    refreshAutoBackupKeyCacheIfEnabled()
+                                    _uiState.update { it.copy(unlockScreen = null) }
+                                    onUnlocked()
                                 }
-                                refreshAutoBackupKeyCacheIfEnabled()
-                                if (!isCurrentPinAttempt(generation, attemptId)) {
-                                    localKeyManager.clearSessionCache()
-                                    return@withContext
-                                }
-                                _uiState.update { it.copy(unlockScreen = null) }
-                                onUnlocked()
                             } finally {
                                 pinUnlockKey.fill(0)
                             }
@@ -308,16 +305,14 @@ internal class MainViewModel @Inject constructor(
         val job = viewModelScope.launch {
             try {
                 validateCandidate(sessionKey)
-                if (!isCurrentBiometricAttempt(generation, attemptId)) return@launch
-                localKeyManager.cacheSessionKeyDirectly(sessionKey)
-                if (!isCurrentBiometricAttempt(generation, attemptId)) {
-                    localKeyManager.clearSessionCache()
-                    return@launch
+                synchronized(lifecycleLock) {
+                    if (!isCurrentBiometricAttempt(generation, attemptId)) return@launch
+                    localKeyManager.cacheSessionKeyDirectly(sessionKey)
+                    activeBiometricAttemptId = null
+                    refreshAutoBackupKeyCacheIfEnabled()
+                    _uiState.update { it.copy(unlockScreen = null) }
+                    onUnlocked()
                 }
-                activeBiometricAttemptId = null
-                refreshAutoBackupKeyCacheIfEnabled()
-                _uiState.update { it.copy(unlockScreen = null) }
-                onUnlocked()
             } catch (_: CancellationException) {
                 if (isCurrentBiometricAttempt(generation, attemptId)) failClosed(generation)
             } catch (e: Exception) {
@@ -402,7 +397,7 @@ internal class MainViewModel @Inject constructor(
     }
 
     /** Invalidates the interactive session and cancels any pending database warm. */
-    fun invalidateSession() {
+    fun invalidateSession() = synchronized(lifecycleLock) {
         lifecycleGeneration++
         activeBiometricAttemptId = null
         activePinSubmissionId = null
@@ -453,8 +448,8 @@ internal class MainViewModel @Inject constructor(
         unlockScreen: MainUiState.UnlockScreen? = MainUiState.UnlockScreen.PASSPHRASE,
         errorMessage: String? = null,
         databaseBlocked: Boolean = false,
-    ) {
-        if (generation != lifecycleGeneration) return
+    ) = synchronized(lifecycleLock) {
+        if (generation != lifecycleGeneration) return@synchronized
         YonteDatabase.close()
         localKeyManager.clearSessionCache()
         _uiState.update {
