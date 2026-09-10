@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — P0: close post-review authentication races (2026-09-10)
+
+- `app/.../MainViewModel.kt`: bind PIN and biometric operations to lifecycle generations, validate PIN and biometric candidates through a non-publishing protected database open before session commit, serialize commit with invalidation, and fail closed on authentication and warming failures.
+- `app/.../MainActivity.kt`, `app/.../YonteAppModule.kt`, `core/database/.../YonteDatabase.kt`: invalidate late biometric callbacks, reject repository access after session invalidation, and keep validation candidates out of the process singleton.
+- `app/src/test/.../MainViewModelTest.kt`, `core/database/src/androidTest/.../YonteDatabaseEncryptionTest.kt`: add deterministic stale-callback and candidate-validation regression coverage. (implementation commits: 485901e, 6f42c19, b6d82e3, 62b67ab, 4a163e3, ce47608, dfa4eda, 5f70554, b2b4589)
+
 ## Unreleased — P0: complete key lifecycle cleanup paths (2026-09-10)
 
 - `app/.../MainViewModel.kt`: clear onboarding return values, track and cancel PIN submissions, isolate each unlock warm operation by lifecycle generation, close the protected database on ViewModel teardown, and clear pending PIN state during invalidation.
