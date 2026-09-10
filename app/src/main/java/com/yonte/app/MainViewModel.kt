@@ -23,12 +23,17 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
+internal fun interface ProtectedDatabaseValidator {
+    suspend fun validate(candidateKey: ByteArray)
+}
+
 @HiltViewModel
 internal class MainViewModel @Inject constructor(
     @ApplicationContext private val appContext: Context,
     private val localKeyManager: LocalKeyManager,
     private val appPinManager: AppPinManager,
     private val biometricUnlockManager: BiometricUnlockManager,
+    private val protectedDatabaseValidator: ProtectedDatabaseValidator,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MainUiState())
@@ -118,7 +123,7 @@ internal class MainViewModel @Inject constructor(
                 candidateKey = withContext(Dispatchers.Default) {
                     localKeyManager.unlock(chars)
                 }
-                validateCandidate(candidateKey ?: error("No candidate key after derivation"))
+                protectedDatabaseValidator.validate(candidateKey ?: error("No candidate key after derivation"))
                 synchronized(lifecycleLock) {
                     check(generation == lifecycleGeneration) { "Session invalidated during authentication" }
                     val validatedKey = candidateKey ?: error("No candidate key after validation")
@@ -235,7 +240,7 @@ internal class MainViewModel @Inject constructor(
                                 return@withContext
                             }
                             try {
-                                validateCandidate(pinUnlockKey)
+                                protectedDatabaseValidator.validate(pinUnlockKey)
                                 synchronized(lifecycleLock) {
                                     if (!isCurrentPinAttempt(generation, attemptId)) return@withContext
                                     localKeyManager.cacheSessionKeyDirectly(pinUnlockKey)
@@ -304,7 +309,7 @@ internal class MainViewModel @Inject constructor(
         }
         val job = viewModelScope.launch {
             try {
-                validateCandidate(sessionKey)
+                protectedDatabaseValidator.validate(sessionKey)
                 synchronized(lifecycleLock) {
                     if (!isCurrentBiometricAttempt(generation, attemptId)) return@launch
                     localKeyManager.cacheSessionKeyDirectly(sessionKey)
@@ -429,19 +434,6 @@ internal class MainViewModel @Inject constructor(
 
     private fun isCurrentBiometricAttempt(generation: Long, attemptId: Long): Boolean =
         generation == lifecycleGeneration && activeBiometricAttemptId == attemptId
-
-    private suspend fun validateCandidate(candidateKey: ByteArray) {
-        val validationDatabase = withContext(Dispatchers.IO) {
-            YonteDatabase.openForValidation(appContext, candidateKey)
-        }
-        try {
-            withContext(Dispatchers.IO) {
-                validationDatabase.noteDao().getAll()
-            }
-        } finally {
-            validationDatabase.close()
-        }
-    }
 
     private fun failClosed(
         generation: Long,
