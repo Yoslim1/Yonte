@@ -4,7 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.yonte.core.database.isDatabaseVersionMismatch
 import com.yonte.core.security.AppPinManager
-import com.yonte.core.security.BiometricGateCipher
+import com.yonte.core.security.BiometricUnlockManager
 import com.yonte.core.security.LocalKeyManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -30,7 +30,7 @@ class MainViewModelTest {
     private lateinit var mockPrefs: SharedPreferences
     private lateinit var mockLocalKeyManager: LocalKeyManager
     private lateinit var mockAppPinManager: AppPinManager
-    private lateinit var mockBiometricGateCipher: BiometricGateCipher
+    private lateinit var mockBiometricUnlockManager: BiometricUnlockManager
 
     @Before
     fun setUp() {
@@ -38,7 +38,7 @@ class MainViewModelTest {
         mockPrefs = mock(SharedPreferences::class.java)
         mockLocalKeyManager = mock(LocalKeyManager::class.java)
         mockAppPinManager = mock(AppPinManager::class.java)
-        mockBiometricGateCipher = mock(BiometricGateCipher::class.java)
+        mockBiometricUnlockManager = mock(BiometricUnlockManager::class.java)
 
         `when`(mockContext.getSharedPreferences(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyInt())).thenReturn(mockPrefs)
         `when`(mockPrefs.getString(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any())).thenReturn(null)
@@ -178,7 +178,7 @@ class MainViewModelTest {
             }
 
             val state = viewModel.uiState.value
-            assertTrue(state.unlocked)
+            assertFalse(state.unlocked)
             assertFalse(state.isWarmingDatabase)
             assertTrue(state.isDatabaseBlocked)
         } finally {
@@ -256,7 +256,7 @@ class MainViewModelTest {
             appContext = mockContext,
             localKeyManager = mockLocalKeyManager,
             appPinManager = mockAppPinManager,
-            biometricGateCipher = mockBiometricGateCipher,
+            biometricUnlockManager = mockBiometricUnlockManager,
         )
     }
 }
