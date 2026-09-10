@@ -118,7 +118,7 @@ class MainViewModelTest {
         val pin = charArrayOf('1', '2', '3', '4')
 
         `when`(mockAppPinManager.lockoutSecondsRemaining()).thenReturn(0L)
-        `when`(mockAppPinManager.verify(org.mockito.ArgumentMatchers.any(CharArray::class.java))).thenReturn(false)
+        `when`(mockAppPinManager.verify(charArrayOf('1', '2', '3', '4'))).thenReturn(false)
         `when`(mockAppPinManager.lockoutSecondsRemaining()).thenReturn(0L)
 
         viewModel.submitPin(pin, isArabic = false)
@@ -134,7 +134,7 @@ class MainViewModelTest {
         val pin = charArrayOf('1', '2', '3', '4')
 
         `when`(mockAppPinManager.lockoutSecondsRemaining()).thenReturn(0L)
-        `when`(mockAppPinManager.verify(org.mockito.ArgumentMatchers.any(CharArray::class.java))).thenReturn(false)
+        `when`(mockAppPinManager.verify(charArrayOf('1', '2', '3', '4'))).thenReturn(false)
         `when`(mockAppPinManager.lockoutSecondsRemaining()).thenReturn(15L)
 
         viewModel.submitPin(pin, isArabic = true)
@@ -150,7 +150,7 @@ class MainViewModelTest {
         val pin = charArrayOf('1', '2', '3', '4')
 
         `when`(mockAppPinManager.lockoutSecondsRemaining()).thenReturn(0L)
-        `when`(mockAppPinManager.verify(org.mockito.ArgumentMatchers.any(CharArray::class.java))).thenReturn(true)
+        `when`(mockAppPinManager.verify(charArrayOf('1', '2', '3', '4'))).thenReturn(true)
         `when`(mockLocalKeyManager.cachedPinUnlockKey()).thenReturn(null)
 
         viewModel.submitPin(pin, isArabic = false)
@@ -182,7 +182,7 @@ class MainViewModelTest {
         val pin = charArrayOf('1', '2', '3', '4')
 
         `when`(mockAppPinManager.lockoutSecondsRemaining()).thenReturn(0L)
-        `when`(mockAppPinManager.verify(org.mockito.ArgumentMatchers.any(CharArray::class.java))).thenReturn(false)
+        `when`(mockAppPinManager.verify(charArrayOf('1', '2', '3', '4'))).thenReturn(false)
         `when`(mockAppPinManager.lockoutSecondsRemaining()).thenReturn(10L)
 
         viewModel.submitPin(pin, isArabic = false)
