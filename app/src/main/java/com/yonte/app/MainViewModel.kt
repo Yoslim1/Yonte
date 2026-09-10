@@ -272,8 +272,8 @@ internal class MainViewModel @Inject constructor(
     }
 
     fun onUnlocked() {
+        val generation = ++lifecycleGeneration
         databaseWarmJob?.cancel()
-        val generation = lifecycleGeneration
         _uiState.update { it.copy(unlocked = true, isWarmingDatabase = true) }
         databaseWarmJob = viewModelScope.launch {
             val result = try {
