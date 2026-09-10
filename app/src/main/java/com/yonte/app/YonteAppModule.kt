@@ -63,7 +63,18 @@ object YonteAppModule {
 
     @Provides
     @Singleton
-    fun provideNoteRepository(database: YonteDatabase): NoteRepository = NoteRepository(database)
+    fun provideNoteRepository(
+        @ApplicationContext context: Context,
+        localKeyManager: LocalKeyManager,
+    ): NoteRepository = NoteRepository {
+        val key = localKeyManager.cachedSessionKey()
+            ?: error("YonteDatabase requested before onboarding/unlock completed")
+        try {
+            YonteDatabase.get(context, key)
+        } finally {
+            key.fill(0)
+        }
+    }
 
     @Provides
     @Singleton
