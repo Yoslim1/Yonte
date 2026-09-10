@@ -7,6 +7,7 @@ import com.yonte.core.security.AppPinManager
 import com.yonte.core.security.BiometricUnlockManager
 import com.yonte.core.security.LocalKeyManager
 import com.yonte.core.backup.ScheduledBackupWorker
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -22,7 +23,9 @@ import org.junit.After
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import org.mockito.Mockito.clearInvocations
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.mockingDetails
 import org.mockito.Mockito.`when`
 
 class MainViewModelTest {
@@ -53,6 +56,110 @@ class MainViewModelTest {
     @After
     fun tearDown() {
         Dispatchers.resetMain()
+    }
+
+    @Test
+    fun `passphrase validates candidate before committing session`() = runTest {
+        val viewModel = createViewModel()
+        val candidate = byteArrayOf(9, 8, 7, 6)
+        var validated = false
+        var committedBeforeValidation = false
+
+        `when`(mockLocalKeyManager.unlock(charArrayOf('p', 'a', 's', 's'))).thenReturn(candidate)
+        val validator = ProtectedDatabaseValidator {
+            committedBeforeValidation = hasInvocation("cacheSessionKeyDirectly")
+            validated = true
+        }
+        val validatingViewModel = createViewModel(validator)
+
+        val job = validatingViewModel.submitPassphrase(
+            passphrase = charArrayOf('p', 'a', 's', 's'),
+            isUnlocking = false,
+            isArabic = false,
+            onUnlockStarted = {},
+            onUnlockFinished = {},
+        )
+
+        job?.join()
+        advanceUntilIdle()
+
+        assertTrue(validated)
+        assertFalse(committedBeforeValidation)
+        assertTrue(validatingViewModel.uiState.value.unlocked)
+        assertFalse(viewModel.uiState.value.unlocked)
+    }
+
+    @Test
+    fun `passphrase validation failure leaves session uncommitted`() = runTest {
+        val viewModel = createViewModel(
+            ProtectedDatabaseValidator { throw IllegalStateException("wrong database key") },
+        )
+        val candidate = byteArrayOf(1, 2, 3, 4)
+        `when`(mockLocalKeyManager.unlock(charArrayOf('p', 'a', 's', 's'))).thenReturn(candidate)
+
+        val job = viewModel.submitPassphrase(
+            passphrase = charArrayOf('p', 'a', 's', 's'),
+            isUnlocking = false,
+            isArabic = false,
+            onUnlockStarted = {},
+            onUnlockFinished = {},
+        )
+
+        job?.join()
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.unlocked)
+        assertEquals(MainUiState.UnlockScreen.PASSPHRASE, viewModel.uiState.value.unlockScreen)
+        assertFalse(hasInvocation("cacheSessionKeyDirectly"))
+    }
+
+    @Test
+    fun `database warming keeps session locked until protected access succeeds`() = runTest {
+        val testDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(testDispatcher)
+        try {
+            val viewModel = createViewModel()
+            val releaseWarm = CompletableDeferred<Unit>()
+            viewModel.setDatabaseWarmer { releaseWarm.await() }
+
+            viewModel.onUnlocked()
+            advanceUntilIdle()
+            assertFalse(viewModel.uiState.value.unlocked)
+            assertTrue(viewModel.uiState.value.isWarmingDatabase)
+
+            releaseWarm.complete(Unit)
+            advanceUntilIdle()
+            assertTrue(viewModel.uiState.value.unlocked)
+            assertFalse(viewModel.uiState.value.isWarmingDatabase)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun `PIN cancellation during validation clears candidate and cannot unlock`() = runTest {
+        val validationStarted = CompletableDeferred<Unit>()
+        val releaseValidation = CompletableDeferred<Unit>()
+        val pinUnlockKey = byteArrayOf(4, 3, 2, 1)
+        val viewModel = createViewModel(
+            ProtectedDatabaseValidator {
+                validationStarted.complete(Unit)
+                releaseValidation.await()
+            },
+        )
+        `when`(mockAppPinManager.lockoutSecondsRemaining()).thenReturn(0L)
+        `when`(mockAppPinManager.verify(charArrayOf('1', '2', '3', '4'))).thenReturn(true)
+        `when`(mockLocalKeyManager.cachedPinUnlockKey()).thenReturn(pinUnlockKey)
+
+        val job = viewModel.submitPin(charArrayOf('1', '2', '3', '4'), isArabic = false)
+        validationStarted.await()
+        viewModel.invalidateSession()
+        releaseValidation.complete(Unit)
+        job?.join()
+
+        assertTrue(pinUnlockKey.all { it == 0.toByte() })
+        assertFalse(viewModel.uiState.value.unlocked)
+        assertFalse(hasInvocation("cacheSessionKeyDirectly"))
     }
 
     @Test
@@ -332,6 +439,9 @@ class MainViewModelTest {
         assertFalse(isDatabaseVersionMismatch(RuntimeException("nope")))
         assertFalse(isDatabaseVersionMismatch(IllegalStateException("A migration ran fine")))
     }
+
+    private fun hasInvocation(methodName: String): Boolean =
+        mockingDetails(mockLocalKeyManager).invocations.any { it.method.name == methodName }
 
     private fun createViewModel(
         candidateValidator: ProtectedDatabaseValidator = ProtectedDatabaseValidator { },
