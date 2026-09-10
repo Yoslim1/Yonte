@@ -173,7 +173,7 @@ class MainActivity : FragmentActivity() {
                         viewModel.handleBiometricUnlockFailure(isArabic(), attemptId)
                     }
                 } catch (_: Exception) {
-                    viewModel.handleBiometricUnlockFailure(isArabic())
+                    viewModel.handleBiometricUnlockFailure(isArabic(), attemptId)
                 }
             }
 
@@ -199,6 +199,7 @@ class MainActivity : FragmentActivity() {
                     BiometricPrompt.CryptoObject(cipher),
                 )
             } catch (e: Exception) {
+                biometricPrompt = null
                 if (e is android.security.keystore.KeyPermanentlyInvalidatedException ||
                     generateSequence(e as Throwable?) { it.cause }.any { it is android.security.keystore.KeyPermanentlyInvalidatedException }
                 ) {
