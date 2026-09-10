@@ -100,6 +100,7 @@ class MainViewModelTest {
         `when`(mockAppPinManager.lockoutSecondsRemaining()).thenReturn(0L)
 
         viewModel.submitPin(pin, isArabic = false)
+        advanceUntilIdle()
 
         val state = viewModel.uiState.value
         assertEquals("Wrong PIN", state.unlockErrorMessage)
@@ -131,6 +132,7 @@ class MainViewModelTest {
         `when`(mockLocalKeyManager.cachedPinUnlockKey()).thenReturn(null)
 
         viewModel.submitPin(pin, isArabic = false)
+        advanceUntilIdle()
 
         val state = viewModel.uiState.value
         assertEquals(MainUiState.UnlockScreen.PASSPHRASE, state.unlockScreen)
@@ -145,6 +147,7 @@ class MainViewModelTest {
         `when`(mockAppPinManager.lockoutSecondsRemaining()).thenReturn(30L)
 
         viewModel.submitPin(pin, isArabic = false)
+        advanceUntilIdle()
 
         val state = viewModel.uiState.value
         assertEquals("Wait 30 seconds", state.unlockErrorMessage)
