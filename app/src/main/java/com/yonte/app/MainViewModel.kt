@@ -106,7 +106,7 @@ internal class MainViewModel @Inject constructor(
                 check(generation == lifecycleGeneration) { "Session invalidated during authentication" }
                 val validatedKey = candidateKey ?: error("No candidate key after validation")
                 localKeyManager.cacheSessionKeyDirectly(validatedKey)
-                candidateKey.fill(0)
+                validatedKey.fill(0)
                 candidateKey = null
                 _uiState.update { it.copy(unlockScreen = null) }
                 onUnlocked()
