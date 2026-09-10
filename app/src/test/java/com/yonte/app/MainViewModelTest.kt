@@ -59,7 +59,7 @@ class MainViewModelTest {
         val fakeKey = byteArrayOf(1, 2, 3, 4)
 
         `when`(mockAppPinManager.lockoutSecondsRemaining()).thenReturn(0L)
-        `when`(mockAppPinManager.verify(org.mockito.ArgumentMatchers.any(CharArray::class.java))).thenReturn(true)
+        `when`(mockAppPinManager.verify(charArrayOf('1', '2', '3', '4'))).thenReturn(true)
         `when`(mockLocalKeyManager.cachedPinUnlockKey()).thenReturn(fakeKey)
 
         viewModel.submitPin(pin, isArabic = false)
@@ -78,8 +78,8 @@ class MainViewModelTest {
         val secondPin = charArrayOf('2', '2', '2', '2')
 
         `when`(mockAppPinManager.lockoutSecondsRemaining()).thenReturn(0L)
-        `when`(mockAppPinManager.verify(org.mockito.ArgumentMatchers.any(CharArray::class.java)))
-            .thenReturn(false, true)
+        `when`(mockAppPinManager.verify(charArrayOf('1', '1', '1', '1'))).thenReturn(false)
+        `when`(mockAppPinManager.verify(charArrayOf('2', '2', '2', '2'))).thenReturn(true)
         `when`(mockLocalKeyManager.cachedPinUnlockKey()).thenReturn(byteArrayOf(1, 2, 3, 4))
 
         viewModel.submitPin(firstPin, isArabic = false)
@@ -98,7 +98,7 @@ class MainViewModelTest {
         val pin = charArrayOf('1', '2', '3', '4')
 
         `when`(mockAppPinManager.lockoutSecondsRemaining()).thenReturn(0L)
-        `when`(mockAppPinManager.verify(org.mockito.ArgumentMatchers.any(CharArray::class.java))).thenReturn(false)
+        `when`(mockAppPinManager.verify(charArrayOf('1', '2', '3', '4'))).thenReturn(false)
         `when`(mockAppPinManager.lockoutSecondsRemaining()).thenReturn(25L)
 
         viewModel.submitPin(pin, isArabic = false)
