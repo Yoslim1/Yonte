@@ -293,6 +293,25 @@ class MainViewModelTest {
     }
 
     @Test
+    fun `PIN candidate validation failure does not commit the session`() = runTest {
+        val viewModel = createViewModel(
+            ProtectedDatabaseValidator { throw IllegalStateException("wrong database key") },
+        )
+        val pin = charArrayOf('1', '2', '3', '4')
+        val pinUnlockKey = byteArrayOf(1, 2, 3, 4)
+
+        `when`(mockAppPinManager.lockoutSecondsRemaining()).thenReturn(0L)
+        `when`(mockAppPinManager.verify(charArrayOf('1', '2', '3', '4'))).thenReturn(true)
+        `when`(mockLocalKeyManager.cachedPinUnlockKey()).thenReturn(pinUnlockKey)
+
+        viewModel.submitPin(pin, isArabic = false)?.join()
+
+        assertFalse(viewModel.uiState.value.unlocked)
+        assertEquals(MainUiState.UnlockScreen.PIN, viewModel.uiState.value.unlockScreen)
+        assertEquals("Unable to unlock with PIN", viewModel.uiState.value.unlockErrorMessage)
+    }
+
+    @Test
     fun `missing migration message is detected as version mismatch`() {
         val error = IllegalStateException(
             "A migration from 3 to 2 was required but not found. " +
@@ -314,12 +333,15 @@ class MainViewModelTest {
         assertFalse(isDatabaseVersionMismatch(IllegalStateException("A migration ran fine")))
     }
 
-    private fun createViewModel(): MainViewModel {
+    private fun createViewModel(
+        candidateValidator: ProtectedDatabaseValidator = ProtectedDatabaseValidator { },
+    ): MainViewModel {
         return MainViewModel(
             appContext = mockContext,
             localKeyManager = mockLocalKeyManager,
             appPinManager = mockAppPinManager,
             biometricUnlockManager = mockBiometricUnlockManager,
+            protectedDatabaseValidator = candidateValidator,
         )
     }
 }
