@@ -52,7 +52,7 @@ object YonteAppModule {
 
     @Provides
     @Singleton
-    fun provideProtectedDatabaseValidator(
+    internal fun provideProtectedDatabaseValidator(
         @ApplicationContext context: Context,
     ): ProtectedDatabaseValidator = ProtectedDatabaseValidator { candidateKey ->
         val database = YonteDatabase.openForValidation(context, candidateKey)
