@@ -12,6 +12,7 @@ import com.yonte.core.security.LocalKeyManager
 import com.yonte.feature.onboarding.PinFieldMode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,6 +41,12 @@ internal class MainViewModel @Inject constructor(
     private var authenticationJob: Job? = null
     private var pinSubmissionJob: Job? = null
     @Volatile private var lifecycleGeneration = 0L
+
+    @Volatile private var pinSubmissionId = 0L
+    @Volatile private var activePinSubmissionId: Long? = null
+    @Volatile private var biometricAttemptId = 0L
+    @Volatile private var activeBiometricAttemptId: Long? = null
+    @Volatile private var biometricAttemptGeneration = 0L
 
     fun setDatabaseWarmer(warmer: suspend () -> Unit) {
         warmDatabase = warmer
@@ -87,7 +94,13 @@ internal class MainViewModel @Inject constructor(
         }
     }
 
-    fun submitPassphrase(passphrase: CharArray, isUnlocking: Boolean, isArabic: Boolean, onUnlockStarted: () -> Unit, onUnlockFinished: () -> Unit) {
+    fun submitPassphrase(
+        passphrase: CharArray,
+        isUnlocking: Boolean,
+        isArabic: Boolean,
+        onUnlockStarted: () -> Unit,
+        onUnlockFinished: () -> Unit,
+    ) {
         if (isUnlocking) {
             passphrase.fill('\u0000')
             return
@@ -102,50 +115,31 @@ internal class MainViewModel @Inject constructor(
             var candidateKey: ByteArray? = null
             try {
                 candidateKey = withContext(Dispatchers.Default) {
-                    // Derivation produces a candidate only. It is not committed to
-                    // session state until the protected database validates it.
                     localKeyManager.unlock(chars)
                 }
-                withContext(Dispatchers.IO) {
-                    val key = candidateKey ?: error("No candidate key after derivation")
-                    YonteDatabase.get(appContext, key).noteDao().getAll()
-                }
+                validateCandidate(candidateKey ?: error("No candidate key after derivation"))
                 check(generation == lifecycleGeneration) { "Session invalidated during authentication" }
                 val validatedKey = candidateKey ?: error("No candidate key after validation")
                 localKeyManager.cacheSessionKeyDirectly(validatedKey)
                 validatedKey.fill(0)
                 candidateKey = null
                 _uiState.update { it.copy(unlockScreen = null) }
-                onUnlocked()
                 refreshAutoBackupKeyCacheIfEnabled()
-            } catch (e: kotlinx.coroutines.CancellationException) {
+                onUnlocked()
+            } catch (_: CancellationException) {
                 if (generation == lifecycleGeneration) {
-                    YonteDatabase.close()
-                    localKeyManager.clearSessionCache()
+                    failClosed(generation)
                 }
                 return@launch
             } catch (e: Exception) {
                 if (generation != lifecycleGeneration) return@launch
-                YonteDatabase.close()
-                localKeyManager.clearSessionCache()
-                if (isDatabaseVersionMismatch(e)) {
-                    _uiState.update {
-                        it.copy(
-                            unlocked = false,
-                            unlockScreen = null,
-                            unlockErrorMessage = null,
-                            isDatabaseBlocked = true,
-                        )
-                    }
-                } else {
-                    _uiState.update {
-                        it.copy(
-                            unlocked = false,
-                            unlockScreen = MainUiState.UnlockScreen.PASSPHRASE,
-                            unlockErrorMessage = if (isArabic) "كلمة السر غلط" else "Wrong passphrase",
-                        )
-                    }
-                }
+                val mismatch = isDatabaseVersionMismatch(e)
+                failClosed(
+                    generation = generation,
+                    unlockScreen = if (mismatch) null else MainUiState.UnlockScreen.PASSPHRASE,
+                    errorMessage = if (mismatch) null else if (isArabic) "كلمة السر غلط" else "Wrong passphrase",
+                    databaseBlocked = mismatch,
+                )
             } finally {
                 candidateKey?.fill(0)
                 chars.fill('\u0000')
@@ -160,57 +154,74 @@ internal class MainViewModel @Inject constructor(
             return null
         }
         pinSubmissionInFlight = true
+        val generation = lifecycleGeneration
+        val attemptId = ++pinSubmissionId
+        activePinSubmissionId = attemptId
         val chars = pin.copyOf()
         pin.fill('\u0000')
         val job = viewModelScope.launch {
             try {
                 withContext(Dispatchers.Default) {
+                    if (!isCurrentPinAttempt(generation, attemptId)) return@withContext
                     _uiState.update { it.copy(unlockErrorMessage = null) }
                     val currentMode = _uiState.value.pinMode
                     if (currentMode == PinFieldMode.CREATE) {
                         val currentCreatedPin = createdPin
                         if (currentCreatedPin == null) {
+                            if (!isCurrentPinAttempt(generation, attemptId)) return@withContext
                             createdPin = chars.copyOf()
                             _uiState.update {
                                 it.copy(pinMode = PinFieldMode.CREATE, unlockScreen = MainUiState.UnlockScreen.PIN)
                             }
                         } else {
                             if (!chars.contentEquals(currentCreatedPin)) {
+                                if (!isCurrentPinAttempt(generation, attemptId)) return@withContext
                                 currentCreatedPin.fill('\u0000')
                                 createdPin = null
                                 _uiState.update {
                                     it.copy(unlockScreen = MainUiState.UnlockScreen.PIN)
                                 }
                             } else {
-                                appPinManager.setPin(chars)
-                                localKeyManager.setUnlockMethod(LocalKeyManager.METHOD_PIN)
-                                localKeyManager.cachedSessionKey()?.let { key ->
-                                    try {
-                                        localKeyManager.cachePinUnlockKey(key)
-                                    } finally {
-                                        key.fill(0)
+                                if (!isCurrentPinAttempt(generation, attemptId)) return@withContext
+                                val sessionKey = localKeyManager.cachedSessionKey()
+                                    ?: error("No session key available for PIN setup")
+                                try {
+                                    localKeyManager.cachePinUnlockKey(sessionKey)
+                                    if (!isCurrentPinAttempt(generation, attemptId)) {
+                                        localKeyManager.clearPinUnlockKey()
+                                        return@withContext
                                     }
+                                    appPinManager.setPin(chars)
+                                    localKeyManager.setUnlockMethod(LocalKeyManager.METHOD_PIN)
+                                } catch (e: Exception) {
+                                    localKeyManager.clearPinUnlockKey()
+                                    throw e
+                                } finally {
+                                    sessionKey.fill(0)
                                 }
                                 currentCreatedPin.fill('\u0000')
                                 createdPin = null
                                 _uiState.update {
                                     it.copy(unlockScreen = null)
                                 }
-                                onUnlocked()
                                 refreshAutoBackupKeyCacheIfEnabled()
+                                onUnlocked()
                             }
                         }
                     } else {
                         if (appPinManager.lockoutSecondsRemaining() > 0) {
                             val secs = appPinManager.lockoutSecondsRemaining()
+                            if (!isCurrentPinAttempt(generation, attemptId)) return@withContext
                             _uiState.update {
                                 it.copy(unlockErrorMessage = if (isArabic) "انتظر $secs ثانية" else "Wait $secs seconds")
                             }
                             return@withContext
                         }
+                        if (!isCurrentPinAttempt(generation, attemptId)) return@withContext
                         if (appPinManager.verify(chars)) {
                             val pinUnlockKey = localKeyManager.cachedPinUnlockKey()
                             if (pinUnlockKey == null) {
+                                if (!isCurrentPinAttempt(generation, attemptId)) return@withContext
                                 _uiState.update {
                                     it.copy(
                                         unlockScreen = MainUiState.UnlockScreen.PASSPHRASE,
@@ -221,15 +232,26 @@ internal class MainViewModel @Inject constructor(
                                 return@withContext
                             }
                             try {
+                                validateCandidate(pinUnlockKey)
+                                if (!isCurrentPinAttempt(generation, attemptId)) return@withContext
                                 localKeyManager.cacheSessionKeyDirectly(pinUnlockKey)
+                                if (!isCurrentPinAttempt(generation, attemptId)) {
+                                    localKeyManager.clearSessionCache()
+                                    return@withContext
+                                }
+                                refreshAutoBackupKeyCacheIfEnabled()
+                                if (!isCurrentPinAttempt(generation, attemptId)) {
+                                    localKeyManager.clearSessionCache()
+                                    return@withContext
+                                }
                                 _uiState.update { it.copy(unlockScreen = null) }
                                 onUnlocked()
-                                refreshAutoBackupKeyCacheIfEnabled()
                             } finally {
                                 pinUnlockKey.fill(0)
                             }
                         } else {
                             val remaining = appPinManager.lockoutSecondsRemaining()
+                            if (!isCurrentPinAttempt(generation, attemptId)) return@withContext
                             _uiState.update {
                                 it.copy(
                                     unlockErrorMessage = if (remaining > 0) {
@@ -242,27 +264,86 @@ internal class MainViewModel @Inject constructor(
                         }
                     }
                 }
+            } catch (_: CancellationException) {
+                if (isCurrentPinAttempt(generation, attemptId)) {
+                    failClosed(generation)
+                }
+            } catch (e: Exception) {
+                if (isCurrentPinAttempt(generation, attemptId)) {
+                    val mismatch = isDatabaseVersionMismatch(e)
+                    failClosed(
+                        generation = generation,
+                        unlockScreen = if (mismatch) null else MainUiState.UnlockScreen.PIN,
+                        errorMessage = if (mismatch) null else "Unable to unlock with PIN",
+                        databaseBlocked = mismatch,
+                    )
+                }
             } finally {
                 chars.fill('\u0000')
-                pinSubmissionInFlight = false
+                if (activePinSubmissionId == attemptId) {
+                    activePinSubmissionId = null
+                    pinSubmissionInFlight = false
+                }
             }
         }
         pinSubmissionJob = job
         return job
     }
 
-    fun handleBiometricUnlockSuccess(sessionKey: ByteArray) {
-        try {
-            localKeyManager.cacheSessionKeyDirectly(sessionKey)
-            _uiState.update { it.copy(unlockScreen = null) }
-            onUnlocked()
-            refreshAutoBackupKeyCacheIfEnabled()
-        } finally {
-            sessionKey.fill(0)
-        }
+    /** Starts one biometric attempt and returns its lifecycle token. */
+    fun beginBiometricUnlock(): Long {
+        val generation = ++lifecycleGeneration
+        val attemptId = ++biometricAttemptId
+        biometricAttemptGeneration = generation
+        activeBiometricAttemptId = attemptId
+        return attemptId
     }
 
-    fun handleBiometricUnlockError(errorCode: Int, errString: CharSequence) {
+    fun handleBiometricUnlockSuccess(sessionKey: ByteArray, attemptId: Long): Job? {
+        val generation = biometricAttemptGeneration
+        if (activeBiometricAttemptId != attemptId || generation != lifecycleGeneration) {
+            sessionKey.fill(0)
+            return null
+        }
+        val job = viewModelScope.launch {
+            try {
+                validateCandidate(sessionKey)
+                if (!isCurrentBiometricAttempt(generation, attemptId)) return@launch
+                localKeyManager.cacheSessionKeyDirectly(sessionKey)
+                if (!isCurrentBiometricAttempt(generation, attemptId)) {
+                    localKeyManager.clearSessionCache()
+                    return@launch
+                }
+                activeBiometricAttemptId = null
+                refreshAutoBackupKeyCacheIfEnabled()
+                _uiState.update { it.copy(unlockScreen = null) }
+                onUnlocked()
+            } catch (_: CancellationException) {
+                if (isCurrentBiometricAttempt(generation, attemptId)) failClosed(generation)
+            } catch (e: Exception) {
+                if (isCurrentBiometricAttempt(generation, attemptId)) {
+                    val mismatch = isDatabaseVersionMismatch(e)
+                    failClosed(
+                        generation = generation,
+                        unlockScreen = if (mismatch) null else MainUiState.UnlockScreen.BIOMETRIC,
+                        errorMessage = if (mismatch) null else "Unable to unlock with biometrics",
+                        databaseBlocked = mismatch,
+                    )
+                }
+            } finally {
+                sessionKey.fill(0)
+            }
+        }
+        return job
+    }
+
+    fun handleBiometricUnlockError(
+        errorCode: Int,
+        errString: CharSequence,
+        attemptId: Long? = null,
+    ) {
+        if (attemptId != null && activeBiometricAttemptId != attemptId) return
+        activeBiometricAttemptId = null
         if (errorCode != androidx.biometric.BiometricPrompt.ERROR_USER_CANCELED &&
             errorCode != androidx.biometric.BiometricPrompt.ERROR_NEGATIVE_BUTTON
         ) {
@@ -270,7 +351,9 @@ internal class MainViewModel @Inject constructor(
         }
     }
 
-    fun handleBiometricUnlockFailure(isArabic: Boolean) {
+    fun handleBiometricUnlockFailure(isArabic: Boolean, attemptId: Long? = null) {
+        if (attemptId != null && activeBiometricAttemptId != attemptId) return
+        activeBiometricAttemptId = null
         _uiState.update {
             it.copy(unlockErrorMessage = if (isArabic) "فشل فتح القفل" else "Unlock failed")
         }
@@ -282,17 +365,15 @@ internal class MainViewModel @Inject constructor(
 
     fun onUnlocked() {
         val generation = ++lifecycleGeneration
+        activeBiometricAttemptId = null
         databaseWarmJob?.cancel()
         _uiState.update { it.copy(unlocked = true, isWarmingDatabase = true) }
         databaseWarmJob = viewModelScope.launch {
             val result = try {
                 warmDatabase?.invoke()
                 Result.success(Unit)
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                if (generation == lifecycleGeneration) {
-                    YonteDatabase.close()
-                    localKeyManager.clearSessionCache()
-                }
+            } catch (_: CancellationException) {
+                if (generation == lifecycleGeneration) failClosed(generation)
                 return@launch
             } catch (e: Exception) {
                 Result.failure<Unit>(e)
@@ -300,25 +381,21 @@ internal class MainViewModel @Inject constructor(
             if (generation != lifecycleGeneration) return@launch
             val failure = result.exceptionOrNull()
             if (failure != null) {
-                YonteDatabase.close()
-                localKeyManager.clearSessionCache()
+                val mismatch = isDatabaseVersionMismatch(failure)
+                failClosed(
+                    generation = generation,
+                    unlockScreen = if (mismatch) null else MainUiState.UnlockScreen.PASSPHRASE,
+                    errorMessage = if (mismatch) null else "Unable to open protected notes",
+                    databaseBlocked = mismatch,
+                )
+                _uiState.update { it.copy(isWarmingDatabase = false) }
+                return@launch
             }
-            val mismatch = failure?.let(::isDatabaseVersionMismatch) ?: false
             _uiState.update {
                 it.copy(
-                    unlocked = failure == null,
+                    unlocked = true,
                     isWarmingDatabase = false,
-                    unlockScreen = when {
-                        mismatch -> null
-                        failure != null -> MainUiState.UnlockScreen.PASSPHRASE
-                        else -> it.unlockScreen
-                    },
-                    unlockErrorMessage = when {
-                        mismatch -> null
-                        failure != null -> "Unable to open protected notes"
-                        else -> it.unlockErrorMessage
-                    },
-                    isDatabaseBlocked = it.isDatabaseBlocked || mismatch,
+                    unlockScreen = it.unlockScreen,
                 )
             }
         }
@@ -327,6 +404,8 @@ internal class MainViewModel @Inject constructor(
     /** Invalidates the interactive session and cancels any pending database warm. */
     fun invalidateSession() {
         lifecycleGeneration++
+        activeBiometricAttemptId = null
+        activePinSubmissionId = null
         authenticationJob?.cancel()
         pinSubmissionJob?.cancel()
         databaseWarmJob?.cancel()
@@ -349,6 +428,46 @@ internal class MainViewModel @Inject constructor(
             )
         }
     }
+
+    private fun isCurrentPinAttempt(generation: Long, attemptId: Long): Boolean =
+        generation == lifecycleGeneration && activePinSubmissionId == attemptId
+
+    private fun isCurrentBiometricAttempt(generation: Long, attemptId: Long): Boolean =
+        generation == lifecycleGeneration && activeBiometricAttemptId == attemptId
+
+    private suspend fun validateCandidate(candidateKey: ByteArray) {
+        val validationDatabase = withContext(Dispatchers.IO) {
+            YonteDatabase.openForValidation(appContext, candidateKey)
+        }
+        try {
+            withContext(Dispatchers.IO) {
+                validationDatabase.noteDao().getAll()
+            }
+        } finally {
+            validationDatabase.close()
+        }
+    }
+
+    private fun failClosed(
+        generation: Long,
+        unlockScreen: MainUiState.UnlockScreen? = MainUiState.UnlockScreen.PASSPHRASE,
+        errorMessage: String? = null,
+        databaseBlocked: Boolean = false,
+    ) {
+        if (generation != lifecycleGeneration) return
+        YonteDatabase.close()
+        localKeyManager.clearSessionCache()
+        _uiState.update {
+            it.copy(
+                unlocked = false,
+                isWarmingDatabase = false,
+                unlockScreen = unlockScreen,
+                unlockErrorMessage = errorMessage,
+                isDatabaseBlocked = it.isDatabaseBlocked || databaseBlocked,
+            )
+        }
+    }
+
     fun choosePinCreate() {
         _uiState.update {
             it.copy(pinMode = PinFieldMode.CREATE, unlockScreen = MainUiState.UnlockScreen.PIN)
@@ -357,18 +476,29 @@ internal class MainViewModel @Inject constructor(
 
     fun chooseSkipUnlock() {
         localKeyManager.setUnlockMethod(LocalKeyManager.METHOD_PASSPHRASE)
-        _uiState.update { it.copy(unlockScreen = null) }
-        onUnlocked()
-        refreshAutoBackupKeyCacheIfEnabled()
+        try {
+            refreshAutoBackupKeyCacheIfEnabled()
+            _uiState.update { it.copy(unlockScreen = null) }
+            onUnlocked()
+        } catch (_: Exception) {
+            val generation = lifecycleGeneration
+            failClosed(
+                generation = generation,
+                unlockScreen = MainUiState.UnlockScreen.PASSPHRASE,
+                errorMessage = "Unable to open protected notes",
+            )
+        }
     }
 
     fun switchToPassphrase() {
+        activeBiometricAttemptId = null
         _uiState.update {
             it.copy(unlockScreen = MainUiState.UnlockScreen.PASSPHRASE, unlockErrorMessage = null)
         }
     }
 
     fun switchToPinOrPassphrase() {
+        activeBiometricAttemptId = null
         _uiState.update {
             it.copy(
                 unlockScreen = if (appPinManager.isPinSet()) MainUiState.UnlockScreen.PIN else MainUiState.UnlockScreen.PASSPHRASE,
@@ -390,6 +520,8 @@ internal class MainViewModel @Inject constructor(
 
     override fun onCleared() {
         lifecycleGeneration++
+        activeBiometricAttemptId = null
+        activePinSubmissionId = null
         authenticationJob?.cancel()
         pinSubmissionJob?.cancel()
         databaseWarmJob?.cancel()
