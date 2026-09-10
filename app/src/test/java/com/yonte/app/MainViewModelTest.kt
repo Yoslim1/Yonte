@@ -8,6 +8,7 @@ import com.yonte.core.security.BiometricGateCipher
 import com.yonte.core.security.LocalKeyManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -180,6 +181,49 @@ class MainViewModelTest {
             assertTrue(state.unlocked)
             assertFalse(state.isWarmingDatabase)
             assertTrue(state.isDatabaseBlocked)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun `database warm failure returns to locked passphrase state`() = runTest {
+        val testDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(testDispatcher)
+        try {
+            val viewModel = createViewModel()
+            viewModel.setDatabaseWarmer {
+                throw IllegalStateException("database open failed")
+            }
+
+            viewModel.onUnlocked()
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertFalse(state.unlocked)
+            assertFalse(state.isWarmingDatabase)
+            assertEquals(MainUiState.UnlockScreen.PASSPHRASE, state.unlockScreen)
+            assertEquals("Unable to open protected notes", state.unlockErrorMessage)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun `session invalidation clears unlocked state and cancels warming`() = runTest {
+        val testDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(testDispatcher)
+        try {
+            val viewModel = createViewModel()
+
+            viewModel.onUnlocked()
+            viewModel.invalidateSession()
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertFalse(state.unlocked)
+            assertFalse(state.isWarmingDatabase)
+            assertEquals(MainUiState.UnlockScreen.PASSPHRASE, state.unlockScreen)
         } finally {
             Dispatchers.resetMain()
         }
