@@ -43,7 +43,7 @@ jobs:
         run: python3 tools/check_changelog.py
 
       - name: Check Kotlin and compile debug APK
-        run: ./gradlew :core:update:test :core:database:test :core:security:test :core:backup:test :feature:notes:test :feature:onboarding:test :feature:settings:test :app:assembleDebug --stacktrace
+        run: ./gradlew :core:update:test :core:database:test :core:security:test :core:backup:test :feature:notes:test :feature:onboarding:test :feature:settings:test :app:test :app:assembleDebug --stacktrace
 
       - name: Enable KVM group perms
         run: |
