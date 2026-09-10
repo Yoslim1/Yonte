@@ -59,7 +59,9 @@ object YonteAppModule {
         val key = localKeyManager.cachedSessionKey()
             ?: error("YonteDatabase requested before onboarding/unlock completed")
         return try {
-            YonteDatabase.get(context, key)
+            YonteDatabase.get(context, key) {
+                isCurrentSessionKey(localKeyManager, key)
+            }
         } finally {
             key.fill(0)
         }
@@ -74,7 +76,9 @@ object YonteAppModule {
         val key = localKeyManager.cachedSessionKey()
             ?: error("YonteDatabase requested before onboarding/unlock completed")
         try {
-            YonteDatabase.get(context, key)
+            YonteDatabase.get(context, key) {
+                isCurrentSessionKey(localKeyManager, key)
+            }
         } finally {
             key.fill(0)
         }
@@ -83,6 +87,15 @@ object YonteAppModule {
     @Provides
     @Singleton
     fun provideBackupGateway(encryptionManager: EncryptionManager): BackupGateway = BackupService(encryptionManager)
+
+    private fun isCurrentSessionKey(localKeyManager: LocalKeyManager, key: ByteArray): Boolean {
+        val current = localKeyManager.cachedSessionKey() ?: return false
+        return try {
+            current.contentEquals(key)
+        } finally {
+            current.fill(0)
+        }
+    }
 
     @Provides
     @Singleton
