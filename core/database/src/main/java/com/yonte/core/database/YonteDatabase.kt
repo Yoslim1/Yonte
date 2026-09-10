@@ -20,7 +20,12 @@ abstract class YonteDatabase : RoomDatabase() {
         /** The passphrase-derived key is required; there is deliberately no plaintext
          * fallback. Callers must only reach here after onboarding/unlock completed
          * (enforced by gating injection in MainActivity, not by a default key). */
-        fun get(context: Context, passphraseKey: ByteArray): YonteDatabase = synchronized(this) {
+        fun get(
+            context: Context,
+            passphraseKey: ByteArray,
+            isAuthorized: (() -> Boolean)? = null,
+        ): YonteDatabase = synchronized(this) {
+            check(isAuthorized?.invoke() != false) { "Database access is no longer authorized" }
             val keyDigest = digest(passphraseKey)
             val current = instance
             if (current != null && current.isOpen && instanceKeyDigest?.contentEquals(keyDigest) == true) {
@@ -43,6 +48,21 @@ abstract class YonteDatabase : RoomDatabase() {
             instance = database
             instanceKeyDigest = keyDigest
             database
+        }
+
+        /** Opens a candidate key for protected-storage validation without touching the
+         * process-level singleton. A wrong candidate therefore cannot close or poison
+         * an already authenticated database instance. The caller owns and closes the
+         * returned database after its validation query. */
+        fun openForValidation(context: Context, passphraseKey: ByteArray): YonteDatabase {
+            val database = build(context.applicationContext, passphraseKey.copyOf())
+            return try {
+                database.openHelper.writableDatabase
+                database
+            } catch (e: Exception) {
+                database.close()
+                throw e
+            }
         }
 
         /** Closes and forgets the process-local instance, if one exists. Never throws:
