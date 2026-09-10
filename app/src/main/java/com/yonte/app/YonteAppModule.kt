@@ -58,7 +58,11 @@ object YonteAppModule {
     ): YonteDatabase {
         val key = localKeyManager.cachedSessionKey()
             ?: error("YonteDatabase requested before onboarding/unlock completed")
-        return YonteDatabase.get(context, key)
+        return try {
+            YonteDatabase.get(context, key)
+        } finally {
+            key.fill(0)
+        }
     }
 
     @Provides
