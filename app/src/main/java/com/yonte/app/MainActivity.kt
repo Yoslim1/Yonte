@@ -69,7 +69,7 @@ class MainActivity : FragmentActivity() {
         sharedText = intent.sharedText()
 
         viewModel.setDatabaseWarmer {
-            withContext(Dispatchers.IO) { noteRepository.get() }
+            withContext(Dispatchers.IO) { noteRepository.get().getAll() }
         }
 
         val biometricAvailable = BiometricManager.from(this)
