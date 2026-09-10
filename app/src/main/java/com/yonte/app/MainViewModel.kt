@@ -386,6 +386,8 @@ internal class MainViewModel @Inject constructor(
         authenticationJob?.cancel()
         pinSubmissionJob?.cancel()
         databaseWarmJob?.cancel()
+        YonteDatabase.close()
+        localKeyManager.clearSessionCache()
         super.onCleared()
         createdPin?.fill('\u0000')
         createdPin = null
