@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — P0: close final lifecycle review blockers (2026-09-10)
+
+- `app/.../MainViewModel.kt`: serialize ViewModel teardown and PIN setup with lifecycle commits, keep the UI locked while protected database warming runs, and reject stale biometric fallback callbacks.
+- `app/.../MainActivity.kt`, `app/.../YonteAppModule.kt`: show protected warm progress before unlock publication and keep the validator implementation internal for Kotlin compilation.
+- `core/database/.../YonteDatabase.kt`, `core/database/src/androidTest/.../YonteDatabaseEncryptionTest.kt`: open replacement candidates before replacing the active singleton and verify invalid candidates preserve the valid instance.
+- `app/src/test/.../MainViewModelTest.kt`: add deterministic passphrase, biometric rejection, warm gating, cancellation, and secret cleanup regression coverage. (implementation commits: 075a71d, 9ef7364, 9d58dd5, 92345a6, dc64c63, d543170, c06bd07, 7c33420, 0f91fcf)
+
 ## Unreleased — P0: close post-review authentication races (2026-09-10)
 
 - `app/.../MainViewModel.kt`: bind PIN and biometric operations to lifecycle generations, validate PIN and biometric candidates through a non-publishing protected database open before session commit, serialize commit with invalidation, and fail closed on authentication and warming failures.
