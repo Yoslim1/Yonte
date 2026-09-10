@@ -77,6 +77,37 @@ class YonteDatabaseEncryptionTest {
     }
 
     @Test
+    fun candidateValidationDoesNotPoisonAnExistingSingleton() = runBlocking {
+        System.loadLibrary("sqlcipher")
+        context.deleteDatabase("yonte.db")
+        YonteDatabase.close()
+        val correctKey = ByteArray(32).also { SecureRandom().nextBytes(it) }
+        val wrongKey = ByteArray(32).also { SecureRandom().nextBytes(it) }
+
+        try {
+            val existing = YonteDatabase.get(context, correctKey)
+            existing.noteDao().getAll()
+
+            try {
+                val candidate = YonteDatabase.openForValidation(context, wrongKey)
+                candidate.noteDao().getAll()
+                fail("An invalid candidate must be rejected")
+            } catch (_: SQLiteException) {
+                // Expected: validation fails without publishing the candidate.
+            }
+
+            val stillOpen = YonteDatabase.get(context, correctKey)
+            assertEquals(true, stillOpen.isOpen)
+            assertEquals(existing, stillOpen)
+        } finally {
+            YonteDatabase.close()
+            context.deleteDatabase("yonte.db")
+            correctKey.fill(0)
+            wrongKey.fill(0)
+        }
+    }
+
+    @Test
     fun encryptedDatabaseOpensWithCorrectKeyAndRejectsWrongKey() = runBlocking {
         System.loadLibrary("sqlcipher")
         context.deleteDatabase(dbName)
