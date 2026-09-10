@@ -135,7 +135,7 @@ class MainActivity : FragmentActivity() {
                         onTriggerBiometric = ::launchBiometricPrompt,
                         onUseFallbackInstead = { viewModel.switchToPinOrPassphrase() },
                     )
-                    uiState.unlocked && uiState.isWarmingDatabase -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    uiState.isWarmingDatabase -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
                     }
                     uiState.unlocked -> NotesOrSettings()
@@ -162,12 +162,8 @@ class MainActivity : FragmentActivity() {
                             val sessionKey = biometricUnlockManager.unwrapSessionKey(cryptoCipher)
                             viewModel.handleBiometricUnlockSuccess(sessionKey, attemptId)
                         } catch (_: Exception) {
-                            // Decryption failed (missing or corrupted cache) — fall back
-                            biometricUnlockManager.clearEnrolledKey()
-                            localKeyManager.setUnlockMethod(
-                                if (appPinManager.isPinSet()) LocalKeyManager.METHOD_PIN else LocalKeyManager.METHOD_PASSPHRASE,
-                            )
-                            viewModel.switchToPinOrPassphrase()
+                            // Decryption failed (missing or corrupted cache) — fall back.
+                            viewModel.handleBiometricUnlockFallback(attemptId)
                         }
                     } else {
                         viewModel.handleBiometricUnlockFailure(isArabic(), attemptId)
@@ -203,23 +199,15 @@ class MainActivity : FragmentActivity() {
                 if (e is android.security.keystore.KeyPermanentlyInvalidatedException ||
                     generateSequence(e as Throwable?) { it.cause }.any { it is android.security.keystore.KeyPermanentlyInvalidatedException }
                 ) {
-                    biometricUnlockManager.clearEnrolledKey()
-                    localKeyManager.setUnlockMethod(
-                        if (appPinManager.isPinSet()) LocalKeyManager.METHOD_PIN else LocalKeyManager.METHOD_PASSPHRASE,
-                    )
-                    viewModel.switchToPinOrPassphrase()
+                    viewModel.handleBiometricUnlockFallback(attemptId)
                 } else {
                     biometricPrompt = null
                     viewModel.handleBiometricUnlockFailure(isArabic(), attemptId)
                 }
             }
         } else {
-            // No IV stored — biometric key is missing or never enrolled
-            biometricUnlockManager.clearEnrolledKey()
-            localKeyManager.setUnlockMethod(
-                if (appPinManager.isPinSet()) LocalKeyManager.METHOD_PIN else LocalKeyManager.METHOD_PASSPHRASE,
-            )
-            viewModel.switchToPinOrPassphrase()
+            // No IV stored — biometric key is missing or never enrolled.
+            viewModel.handleBiometricUnlockFallback(attemptId)
         }
     }
 
