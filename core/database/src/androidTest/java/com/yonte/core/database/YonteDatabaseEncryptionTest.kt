@@ -58,6 +58,9 @@ class YonteDatabaseEncryptionTest {
         try {
             YonteDatabase.get(context, correctKey).noteDao().getAll()
 
+            val existing = YonteDatabase.get(context, correctKey)
+            existing.noteDao().getAll()
+
             try {
                 YonteDatabase.get(context, wrongKey)
                 fail("A wrong singleton key must be rejected before publication")
@@ -65,8 +68,10 @@ class YonteDatabaseEncryptionTest {
                 // Expected: SQLCipher rejects the candidate before publication.
             }
 
+            assertEquals(true, existing.isOpen)
             val reopened = YonteDatabase.get(context, correctKey)
             reopened.noteDao().getAll()
+            assertEquals(existing, reopened)
             assertEquals(true, reopened.isOpen)
         } finally {
             YonteDatabase.close()
