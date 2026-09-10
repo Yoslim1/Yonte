@@ -6,6 +6,7 @@ import com.yonte.core.database.isDatabaseVersionMismatch
 import com.yonte.core.security.AppPinManager
 import com.yonte.core.security.BiometricUnlockManager
 import com.yonte.core.security.LocalKeyManager
+import com.yonte.core.backup.ScheduledBackupWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -41,8 +42,10 @@ class MainViewModelTest {
         mockBiometricUnlockManager = mock(BiometricUnlockManager::class.java)
         Dispatchers.setMain(UnconfinedTestDispatcher())
 
-        `when`(mockContext.getSharedPreferences(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyInt())).thenReturn(mockPrefs)
-        `when`(mockPrefs.getString(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any())).thenReturn(null)
+        `when`(
+            mockContext.getSharedPreferences(ScheduledBackupWorker.PREFS_NAME, Context.MODE_PRIVATE),
+        ).thenReturn(mockPrefs)
+        `when`(mockPrefs.getString(ScheduledBackupWorker.KEY_DESTINATION_URI, null)).thenReturn(null)
         `when`(mockLocalKeyManager.isFirstRun()).thenReturn(false)
         `when`(mockLocalKeyManager.unlockMethod()).thenReturn(LocalKeyManager.METHOD_PASSPHRASE)
     }
