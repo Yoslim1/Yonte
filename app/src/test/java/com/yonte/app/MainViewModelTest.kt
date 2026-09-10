@@ -65,7 +65,7 @@ class MainViewModelTest {
         `when`(mockAppPinManager.verify(charArrayOf('1', '2', '3', '4'))).thenReturn(true)
         `when`(mockLocalKeyManager.cachedPinUnlockKey()).thenReturn(fakeKey)
 
-        viewModel.submitPin(pin, isArabic = false)
+        viewModel.submitPin(pin, isArabic = false)?.join()
         advanceUntilIdle()
 
         val state = viewModel.uiState.value
@@ -85,11 +85,11 @@ class MainViewModelTest {
         `when`(mockAppPinManager.verify(charArrayOf('2', '2', '2', '2'))).thenReturn(true)
         `when`(mockLocalKeyManager.cachedPinUnlockKey()).thenReturn(byteArrayOf(1, 2, 3, 4))
 
-        viewModel.submitPin(firstPin, isArabic = false)
+        viewModel.submitPin(firstPin, isArabic = false)?.join()
         advanceUntilIdle()
         assertFalse(viewModel.uiState.value.unlocked)
 
-        viewModel.submitPin(secondPin, isArabic = false)
+        viewModel.submitPin(secondPin, isArabic = false)?.join()
         advanceUntilIdle()
         assertTrue(viewModel.uiState.value.unlocked)
         assertFalse(viewModel.uiState.value.isWarmingDatabase)
@@ -104,7 +104,7 @@ class MainViewModelTest {
         `when`(mockAppPinManager.verify(charArrayOf('1', '2', '3', '4'))).thenReturn(false)
         `when`(mockAppPinManager.lockoutSecondsRemaining()).thenReturn(25L)
 
-        viewModel.submitPin(pin, isArabic = false)
+        viewModel.submitPin(pin, isArabic = false)?.join()
         advanceUntilIdle()
 
         val state = viewModel.uiState.value
@@ -121,7 +121,7 @@ class MainViewModelTest {
         `when`(mockAppPinManager.verify(charArrayOf('1', '2', '3', '4'))).thenReturn(false)
         `when`(mockAppPinManager.lockoutSecondsRemaining()).thenReturn(0L)
 
-        viewModel.submitPin(pin, isArabic = false)
+        viewModel.submitPin(pin, isArabic = false)?.join()
         advanceUntilIdle()
 
         val state = viewModel.uiState.value
@@ -137,7 +137,7 @@ class MainViewModelTest {
         `when`(mockAppPinManager.verify(charArrayOf('1', '2', '3', '4'))).thenReturn(false)
         `when`(mockAppPinManager.lockoutSecondsRemaining()).thenReturn(15L)
 
-        viewModel.submitPin(pin, isArabic = true)
+        viewModel.submitPin(pin, isArabic = true)?.join()
         advanceUntilIdle()
 
         val state = viewModel.uiState.value
@@ -153,7 +153,7 @@ class MainViewModelTest {
         `when`(mockAppPinManager.verify(charArrayOf('1', '2', '3', '4'))).thenReturn(true)
         `when`(mockLocalKeyManager.cachedPinUnlockKey()).thenReturn(null)
 
-        viewModel.submitPin(pin, isArabic = false)
+        viewModel.submitPin(pin, isArabic = false)?.join()
         advanceUntilIdle()
 
         val state = viewModel.uiState.value
@@ -168,7 +168,7 @@ class MainViewModelTest {
 
         `when`(mockAppPinManager.lockoutSecondsRemaining()).thenReturn(30L)
 
-        viewModel.submitPin(pin, isArabic = false)
+        viewModel.submitPin(pin, isArabic = false)?.join()
         advanceUntilIdle()
 
         val state = viewModel.uiState.value
@@ -185,7 +185,7 @@ class MainViewModelTest {
         `when`(mockAppPinManager.verify(charArrayOf('1', '2', '3', '4'))).thenReturn(false)
         `when`(mockAppPinManager.lockoutSecondsRemaining()).thenReturn(10L)
 
-        viewModel.submitPin(pin, isArabic = false)
+        viewModel.submitPin(pin, isArabic = false)?.join()
         advanceUntilIdle()
         assertNotNull(viewModel.uiState.value.unlockErrorMessage)
 
