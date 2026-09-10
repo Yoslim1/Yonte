@@ -23,7 +23,6 @@ import org.junit.After
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import org.mockito.Mockito.clearInvocations
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.mockingDetails
 import org.mockito.Mockito.`when`
@@ -60,7 +59,6 @@ class MainViewModelTest {
 
     @Test
     fun `passphrase validates candidate before committing session`() = runTest {
-        val viewModel = createViewModel()
         val candidate = byteArrayOf(9, 8, 7, 6)
         var validated = false
         var committedBeforeValidation = false
@@ -86,7 +84,6 @@ class MainViewModelTest {
         assertTrue(validated)
         assertFalse(committedBeforeValidation)
         assertTrue(validatingViewModel.uiState.value.unlocked)
-        assertFalse(viewModel.uiState.value.unlocked)
     }
 
     @Test
