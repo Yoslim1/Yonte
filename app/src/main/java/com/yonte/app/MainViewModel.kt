@@ -86,23 +86,35 @@ internal class MainViewModel @Inject constructor(
         _uiState.update { it.copy(unlockErrorMessage = null) }
         viewModelScope.launch {
             val chars = passphrase.copyOf()
+            var candidateKey: ByteArray? = null
             try {
-                withContext(Dispatchers.Default) {
+                candidateKey = withContext(Dispatchers.Default) {
+                    // Derivation produces a candidate only. It is not committed to
+                    // session state until the protected database validates it.
                     localKeyManager.unlock(chars)
                 }
                 withContext(Dispatchers.IO) {
-                    val key = localKeyManager.cachedSessionKey()
-                        ?: error("No cached key after unlock")
+                    val key = candidateKey ?: error("No candidate key after derivation")
                     YonteDatabase.get(appContext, key).noteDao().getAll()
                 }
+                val validatedKey = candidateKey ?: error("No candidate key after validation")
+                localKeyManager.cacheSessionKeyDirectly(validatedKey)
+                candidateKey.fill(0)
+                candidateKey = null
                 _uiState.update { it.copy(unlockScreen = null) }
                 onUnlocked()
                 refreshAutoBackupKeyCacheIfEnabled()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                YonteDatabase.close()
+                localKeyManager.clearSessionCache()
+                throw e
             } catch (e: Exception) {
+                YonteDatabase.close()
+                localKeyManager.clearSessionCache()
                 if (isDatabaseVersionMismatch(e)) {
-                    YonteDatabase.close()
                     _uiState.update {
                         it.copy(
+                            unlocked = false,
                             unlockScreen = null,
                             unlockErrorMessage = null,
                             isDatabaseBlocked = true,
@@ -110,10 +122,15 @@ internal class MainViewModel @Inject constructor(
                     }
                 } else {
                     _uiState.update {
-                        it.copy(unlockErrorMessage = if (isArabic) "كلمة السر غلط" else "Wrong passphrase")
+                        it.copy(
+                            unlocked = false,
+                            unlockScreen = MainUiState.UnlockScreen.PASSPHRASE,
+                            unlockErrorMessage = if (isArabic) "كلمة السر غلط" else "Wrong passphrase",
+                        )
                     }
                 }
             } finally {
+                candidateKey?.fill(0)
                 chars.fill('\u0000')
                 onUnlockFinished()
             }
@@ -147,7 +164,13 @@ internal class MainViewModel @Inject constructor(
                             } else {
                                 appPinManager.setPin(chars)
                                 localKeyManager.setUnlockMethod(LocalKeyManager.METHOD_PIN)
-                                localKeyManager.cachedSessionKey()?.let { localKeyManager.cachePinUnlockKey(it) }
+                                localKeyManager.cachedSessionKey()?.let { key ->
+                                    try {
+                                        localKeyManager.cachePinUnlockKey(key)
+                                    } finally {
+                                        key.fill(0)
+                                    }
+                                }
                                 currentCreatedPin.fill('\u0000')
                                 createdPin = null
                                 _uiState.update {
@@ -177,10 +200,14 @@ internal class MainViewModel @Inject constructor(
                                 }
                                 return@withContext
                             }
-                            localKeyManager.cacheSessionKeyDirectly(pinUnlockKey)
-                            _uiState.update { it.copy(unlockScreen = null) }
-                            onUnlocked()
-                            refreshAutoBackupKeyCacheIfEnabled()
+                            try {
+                                localKeyManager.cacheSessionKeyDirectly(pinUnlockKey)
+                                _uiState.update { it.copy(unlockScreen = null) }
+                                onUnlocked()
+                                refreshAutoBackupKeyCacheIfEnabled()
+                            } finally {
+                                pinUnlockKey.fill(0)
+                            }
                         } else {
                             val remaining = appPinManager.lockoutSecondsRemaining()
                             _uiState.update {
@@ -234,16 +261,38 @@ internal class MainViewModel @Inject constructor(
     fun onUnlocked() {
         _uiState.update { it.copy(unlocked = true, isWarmingDatabase = true) }
         viewModelScope.launch {
-            val result = withContext(Dispatchers.IO) {
-                runCatching { warmDatabase?.invoke() }
-            }
-            val mismatch = result.exceptionOrNull()?.let(::isDatabaseVersionMismatch) ?: false
-            if (mismatch) {
+            val result = try {
+                withContext(Dispatchers.IO) {
+                    warmDatabase?.invoke()
+                }
+                Result.success(Unit)
+            } catch (e: kotlinx.coroutines.CancellationException) {
                 YonteDatabase.close()
+                localKeyManager.clearSessionCache()
+                throw e
+            } catch (e: Exception) {
+                Result.failure<Unit>(e)
             }
+            val failure = result.exceptionOrNull()
+            if (failure != null) {
+                YonteDatabase.close()
+                localKeyManager.clearSessionCache()
+            }
+            val mismatch = failure?.let(::isDatabaseVersionMismatch) ?: false
             _uiState.update {
                 it.copy(
+                    unlocked = failure == null,
                     isWarmingDatabase = false,
+                    unlockScreen = when {
+                        mismatch -> null
+                        failure != null -> MainUiState.UnlockScreen.PASSPHRASE
+                        else -> it.unlockScreen
+                    },
+                    unlockErrorMessage = when {
+                        mismatch -> null
+                        failure != null -> "Unable to open protected notes"
+                        else -> it.unlockErrorMessage
+                    },
                     isDatabaseBlocked = it.isDatabaseBlocked || mismatch,
                 )
             }
@@ -282,7 +331,11 @@ internal class MainViewModel @Inject constructor(
         val prefs = appContext.getSharedPreferences(ScheduledBackupWorker.PREFS_NAME, Context.MODE_PRIVATE)
         if (prefs.getString(ScheduledBackupWorker.KEY_DESTINATION_URI, null) == null) return
         val key = localKeyManager.cachedSessionKey() ?: return
-        localKeyManager.cacheAutoBackupKey(key)
+        try {
+            localKeyManager.cacheAutoBackupKey(key)
+        } finally {
+            key.fill(0)
+        }
     }
 
     override fun onCleared() {
