@@ -20,8 +20,13 @@ object ArabicNormalizer {
         .trim()
 }
 
-class NoteRepository(private val database: YonteDatabase) {
-    private val dao = database.noteDao()
+class NoteRepository(private val databaseProvider: () -> YonteDatabase) {
+    constructor(database: YonteDatabase) : this({ database })
+
+    private val database: YonteDatabase
+        get() = databaseProvider()
+    private val dao: NoteDao
+        get() = database.noteDao()
 
     fun observeActive(): Flow<List<NoteEntity>> = dao.observeActive()
 
