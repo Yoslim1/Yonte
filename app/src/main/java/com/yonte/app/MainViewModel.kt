@@ -106,10 +106,10 @@ internal class MainViewModel @Inject constructor(
         isArabic: Boolean,
         onUnlockStarted: () -> Unit,
         onUnlockFinished: () -> Unit,
-    ) {
+    ): Job? {
         if (isUnlocking) {
             passphrase.fill('\u0000')
-            return
+            return null
         }
         onUnlockStarted()
         _uiState.update { it.copy(unlockErrorMessage = null) }
@@ -154,6 +154,7 @@ internal class MainViewModel @Inject constructor(
                 onUnlockFinished()
             }
         }
+        return authenticationJob
     }
 
     fun submitPin(pin: CharArray, isArabic: Boolean): Job? {
