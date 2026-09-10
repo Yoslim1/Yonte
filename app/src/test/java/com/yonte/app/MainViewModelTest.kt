@@ -263,6 +263,36 @@ class MainViewModelTest {
     }
 
     @Test
+    fun `PIN attempt completed after invalidation cannot publish a session`() = runTest {
+        val testDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(testDispatcher)
+        try {
+            val viewModel = createViewModel()
+            viewModel.submitPin(charArrayOf('1', '2', '3', '4'), isArabic = false)
+            viewModel.invalidateSession()
+            advanceUntilIdle()
+
+            assertFalse(viewModel.uiState.value.unlocked)
+            assertFalse(viewModel.uiState.value.isWarmingDatabase)
+            assertEquals(MainUiState.UnlockScreen.PASSPHRASE, viewModel.uiState.value.unlockScreen)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun `biometric result received after invalidation is rejected and cleared`() {
+        val viewModel = createViewModel()
+        val attemptId = viewModel.beginBiometricUnlock()
+        viewModel.invalidateSession()
+        val sessionKey = byteArrayOf(1, 2, 3, 4)
+
+        assertNull(viewModel.handleBiometricUnlockSuccess(sessionKey, attemptId))
+        assertTrue(sessionKey.all { it == 0.toByte() })
+        assertFalse(viewModel.uiState.value.unlocked)
+    }
+
+    @Test
     fun `missing migration message is detected as version mismatch`() {
         val error = IllegalStateException(
             "A migration from 3 to 2 was required but not found. " +
