@@ -38,6 +38,7 @@ internal class MainViewModel @Inject constructor(
     private var warmDatabase: (suspend () -> Unit)? = null
     private var databaseWarmJob: Job? = null
     private var authenticationJob: Job? = null
+    private var pinSubmissionJob: Job? = null
     @Volatile private var lifecycleGeneration = 0L
 
     fun setDatabaseWarmer(warmer: suspend () -> Unit) {
@@ -70,11 +71,13 @@ internal class MainViewModel @Inject constructor(
         onStarted()
         viewModelScope.launch {
             val chars = passphrase.toCharArray()
+            var setupKey: ByteArray? = null
             try {
-                withContext(Dispatchers.Default) {
+                setupKey = withContext(Dispatchers.Default) {
                     localKeyManager.setupPassphrase(chars)
                 }
             } finally {
+                setupKey?.fill(0)
                 chars.fill('\u0000')
             }
             _uiState.update {
@@ -152,7 +155,7 @@ internal class MainViewModel @Inject constructor(
         pinSubmissionInFlight = true
         val chars = pin.copyOf()
         pin.fill('\u0000')
-        viewModelScope.launch {
+        pinSubmissionJob = viewModelScope.launch {
             try {
                 withContext(Dispatchers.Default) {
                     _uiState.update { it.copy(unlockErrorMessage = null) }
@@ -283,7 +286,7 @@ internal class MainViewModel @Inject constructor(
                     YonteDatabase.close()
                     localKeyManager.clearSessionCache()
                 }
-                throw e
+                return@launch
             } catch (e: Exception) {
                 Result.failure<Unit>(e)
             }
@@ -318,8 +321,12 @@ internal class MainViewModel @Inject constructor(
     fun invalidateSession() {
         lifecycleGeneration++
         authenticationJob?.cancel()
+        pinSubmissionJob?.cancel()
         databaseWarmJob?.cancel()
         databaseWarmJob = null
+        createdPin?.fill('\u0000')
+        createdPin = null
+        pinSubmissionInFlight = false
         YonteDatabase.close()
         localKeyManager.clearSessionCache()
         _uiState.update {
@@ -377,6 +384,7 @@ internal class MainViewModel @Inject constructor(
     override fun onCleared() {
         lifecycleGeneration++
         authenticationJob?.cancel()
+        pinSubmissionJob?.cancel()
         databaseWarmJob?.cancel()
         super.onCleared()
         createdPin?.fill('\u0000')
