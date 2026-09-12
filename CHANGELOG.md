@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — P0: fail closed during final unlock cleanup (2026-09-12)
+
+- `app/.../MainViewModel.kt`, `core/security/.../LocalKeyManager.kt`, `app/src/test/.../MainViewModelTest.kt`, `core/security/src/test/.../LocalKeyManagerTest.kt`: take passphrase ownership before launching, register completion cleanup for PIN and biometric buffers, and start owned unlock jobs undispatched so cancellation cannot bypass cleanup; reject an absent protected-database warmer, atomically roll back PIN cache/method metadata and credentials on setup failure without suppressing cleanup errors, then fail closed even when cleanup reports errors; cover teardown secret cleanup deterministically.
+- `core/security/.../AppPinManager.kt`, `core/security/src/test/.../AppPinManagerTest.kt`: zero derived PIN material after persistence and provide tested complete-PIN rollback for interrupted setup. (implementation commit: pending)
+
 ## Unreleased — P0: close final lifecycle review blockers (2026-09-10)
 
 - `app/.../MainViewModel.kt`: serialize ViewModel teardown and PIN setup with lifecycle commits, keep the UI locked while protected database warming runs, and reject stale biometric fallback callbacks.

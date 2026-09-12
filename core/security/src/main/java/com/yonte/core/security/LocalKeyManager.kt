@@ -116,6 +116,15 @@ class LocalKeyManager(context: Context, private val cacheManager: SessionKeyCiph
         prefs.edit().remove(KEY_PIN_UNLOCK_CACHE).apply()
     }
 
+    /** Atomically disables PIN unlock by removing its key cache and selecting the
+     * passphrase fallback in one preferences transaction. */
+    fun clearPinUnlockConfiguration() {
+        prefs.edit()
+            .remove(KEY_PIN_UNLOCK_CACHE)
+            .putString(KEY_UNLOCK_METHOD, METHOD_PASSPHRASE)
+            .apply()
+    }
+
     companion object {
         private const val KEY_SALT = "local_key_salt"
         private const val KEY_SESSION_CACHE = "local_key_session_cache"

@@ -2,6 +2,7 @@ package com.yonte.app
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.lifecycle.ViewModelStore
 import com.yonte.core.database.isDatabaseVersionMismatch
 import com.yonte.core.security.AppPinManager
 import com.yonte.core.security.BiometricUnlockManager
@@ -9,12 +10,14 @@ import com.yonte.core.security.LocalKeyManager
 import com.yonte.core.backup.ScheduledBackupWorker
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -25,6 +28,8 @@ import org.junit.Before
 import org.junit.Test
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.mockingDetails
+import org.mockito.Mockito.doThrow
+import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 
 class MainViewModelTest {
@@ -112,6 +117,63 @@ class MainViewModelTest {
     }
 
     @Test
+    fun `a stale passphrase attempt cannot overwrite a newer successful attempt`() = runTest {
+        val firstValidationStarted = CompletableDeferred<Unit>()
+        val releaseFirstValidation = CompletableDeferred<Unit>()
+        var validationCount = 0
+        val viewModel = createViewModel(
+            ProtectedDatabaseValidator {
+                validationCount++
+                if (validationCount == 1) {
+                    firstValidationStarted.complete(Unit)
+                    withContext(NonCancellable) { releaseFirstValidation.await() }
+                }
+            },
+        )
+        val firstCandidate = byteArrayOf(1, 1, 1, 1)
+        val secondCandidate = byteArrayOf(2, 2, 2, 2)
+        `when`(mockLocalKeyManager.unlock(org.mockito.ArgumentMatchers.any(CharArray::class.java)))
+            .thenReturn(firstCandidate, secondCandidate)
+
+        val first = viewModel.submitPassphrase(
+            charArrayOf('1'), false, false, {}, {},
+        )
+        firstValidationStarted.await()
+        val second = viewModel.submitPassphrase(
+            charArrayOf('2'), false, false, {}, {},
+        )
+        second?.join()
+        releaseFirstValidation.complete(Unit)
+        first?.join()
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.unlocked)
+        assertTrue(firstCandidate.all { it == 0.toByte() })
+        assertTrue(secondCandidate.all { it == 0.toByte() })
+    }
+
+    @Test
+    fun `passphrase cancellation before dispatched work clears caller buffer and finishes`() = runTest {
+        val testDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(testDispatcher)
+        try {
+            val viewModel = createViewModel()
+            val passphrase = charArrayOf('s', 'e', 'c', 'r', 'e', 't')
+            var finished = false
+
+            val job = viewModel.submitPassphrase(passphrase, false, false, {}, { finished = true })
+            viewModel.invalidateSession()
+            job?.join()
+
+            assertTrue(passphrase.all { it == '\u0000' })
+            assertTrue(finished)
+            assertFalse(viewModel.uiState.value.unlocked)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
     fun `database warming keeps session locked until protected access succeeds`() = runTest {
         val testDispatcher = StandardTestDispatcher(testScheduler)
         Dispatchers.setMain(testDispatcher)
@@ -174,6 +236,59 @@ class MainViewModelTest {
         assertTrue(pinUnlockKey.all { it == 0.toByte() })
         assertFalse(viewModel.uiState.value.unlocked)
         assertFalse(hasInvocation("cacheSessionKeyDirectly"))
+    }
+
+    @Test
+    fun `PIN persistence failure rolls back credential cache pending PIN and method`() = runTest {
+        val viewModel = createViewModel()
+        viewModel.choosePinCreate()
+        `when`(mockLocalKeyManager.cachedSessionKey()).thenReturn(byteArrayOf(7, 7, 7, 7))
+
+        viewModel.submitPin(charArrayOf('1', '2', '3', '4'), isArabic = false)?.join()
+        doThrow(IllegalStateException("metadata write failed"))
+            .`when`(mockLocalKeyManager)
+            .setUnlockMethod(LocalKeyManager.METHOD_PIN)
+
+        viewModel.submitPin(charArrayOf('1', '2', '3', '4'), isArabic = false)?.join()
+
+        verify(mockLocalKeyManager).clearPinUnlockConfiguration()
+        verify(mockAppPinManager).clearPin()
+        val methodWrites = mockingDetails(mockLocalKeyManager).invocations
+            .filter { it.method.name == "clearPinUnlockConfiguration" }
+        assertTrue(methodWrites.isNotEmpty())
+
+        // The old confirmation is gone: this is a fresh first entry, not a retry
+        // that can persist a credential with stale state.
+        viewModel.submitPin(charArrayOf('1', '2', '3', '4'), isArabic = false)?.join()
+        assertEquals(
+            1,
+            mockingDetails(mockLocalKeyManager).invocations.count {
+                it.method.name == "cachePinUnlockKey"
+            },
+        )
+    }
+
+    @Test
+    fun `PIN rollback attempts credential clearing when local rollback reports failure`() = runTest {
+        val viewModel = createViewModel()
+        viewModel.choosePinCreate()
+        `when`(mockLocalKeyManager.cachedSessionKey()).thenReturn(byteArrayOf(8, 8, 8, 8))
+        viewModel.submitPin(charArrayOf('1', '2', '3', '4'), isArabic = false)?.join()
+        doThrow(IllegalStateException("metadata write failed"))
+            .`when`(mockLocalKeyManager)
+            .setUnlockMethod(LocalKeyManager.METHOD_PIN)
+        doThrow(IllegalStateException("local rollback failed"))
+            .`when`(mockLocalKeyManager)
+            .clearPinUnlockConfiguration()
+
+        viewModel.submitPin(charArrayOf('1', '2', '3', '4'), isArabic = false)?.join()
+
+        // A failed local transaction is observable, but it cannot prevent removal
+        // of the independent PIN credential; therefore no usable PIN remains.
+        verify(mockAppPinManager).clearPin()
+        assertTrue(hasInvocation("clearSessionCache"))
+        assertFalse(viewModel.uiState.value.unlocked)
+        assertEquals(MainUiState.UnlockScreen.PIN, viewModel.uiState.value.unlockScreen)
     }
 
     @Test
@@ -364,6 +479,70 @@ class MainViewModelTest {
     }
 
     @Test
+    fun `missing database warmer fails closed instead of publishing unlock`() = runTest {
+        val viewModel = createViewModel(configureWarmer = false)
+
+        viewModel.onUnlocked()
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.unlocked)
+        assertFalse(viewModel.uiState.value.isWarmingDatabase)
+        assertEquals(MainUiState.UnlockScreen.PASSPHRASE, viewModel.uiState.value.unlockScreen)
+    }
+
+    @Test
+    fun `ViewModel teardown cancels warming and clears the session`() = runTest {
+        val testDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(testDispatcher)
+        try {
+            val viewModel = createViewModel()
+            val releaseWarm = CompletableDeferred<Unit>()
+            viewModel.setDatabaseWarmer { releaseWarm.await() }
+            val store = ViewModelStore()
+            store.put("main", viewModel)
+
+            viewModel.onUnlocked()
+            store.clear()
+            releaseWarm.complete(Unit)
+            advanceUntilIdle()
+
+            assertTrue(hasInvocation("clearSessionCache"))
+            assertFalse(viewModel.uiState.value.unlocked)
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun `ViewModel teardown clears an in-flight passphrase candidate`() = runTest {
+        val validationStarted = CompletableDeferred<Unit>()
+        val releaseValidation = CompletableDeferred<Unit>()
+        val candidate = byteArrayOf(3, 3, 3, 3)
+        `when`(mockLocalKeyManager.unlock(org.mockito.ArgumentMatchers.any(CharArray::class.java)))
+            .thenReturn(candidate)
+        val viewModel = createViewModel(
+            ProtectedDatabaseValidator {
+                validationStarted.complete(Unit)
+                releaseValidation.await()
+            },
+        )
+        val store = ViewModelStore()
+        store.put("main", viewModel)
+        val passphrase = charArrayOf('s', 'e', 'c', 'r', 'e', 't')
+
+        val job = viewModel.submitPassphrase(passphrase, false, false, {}, {})
+        validationStarted.await()
+        store.clear()
+        releaseValidation.complete(Unit)
+        job?.join()
+
+        assertTrue(passphrase.all { it == '\u0000' })
+        assertTrue(candidate.all { it == 0.toByte() })
+        assertTrue(hasInvocation("clearSessionCache"))
+        assertFalse(viewModel.uiState.value.unlocked)
+    }
+
+    @Test
     fun `session invalidation clears unlocked state and cancels warming`() = runTest {
         val testDispatcher = StandardTestDispatcher(testScheduler)
         Dispatchers.setMain(testDispatcher)
@@ -459,6 +638,7 @@ class MainViewModelTest {
 
     private fun createViewModel(
         candidateValidator: ProtectedDatabaseValidator = ProtectedDatabaseValidator { },
+        configureWarmer: Boolean = true,
     ): MainViewModel {
         return MainViewModel(
             appContext = mockContext,
@@ -466,6 +646,8 @@ class MainViewModelTest {
             appPinManager = mockAppPinManager,
             biometricUnlockManager = mockBiometricUnlockManager,
             protectedDatabaseValidator = candidateValidator,
-        )
+        ).also { viewModel ->
+            if (configureWarmer) viewModel.setDatabaseWarmer { }
+        }
     }
 }

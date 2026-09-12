@@ -13,6 +13,7 @@ import com.yonte.feature.onboarding.PinFieldMode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -82,7 +83,7 @@ internal class MainViewModel @Inject constructor(
     fun completeOnboarding(passphrase: String, isUnlocking: Boolean, onStarted: () -> Unit, onFinished: () -> Unit) {
         if (isUnlocking) return
         onStarted()
-        viewModelScope.launch {
+        viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
             val chars = passphrase.toCharArray()
             var setupKey: ByteArray? = null
             try {
@@ -115,9 +116,11 @@ internal class MainViewModel @Inject constructor(
         _uiState.update { it.copy(unlockErrorMessage = null) }
         val generation = ++lifecycleGeneration
         authenticationJob?.cancel()
-        authenticationJob = viewModelScope.launch {
-            val chars = passphrase.copyOf()
-            passphrase.fill('\u0000')
+        // Take ownership before launching: a cancelled scope is permitted to skip a
+        // coroutine body entirely, but must never retain the caller's passphrase.
+        val chars = passphrase.copyOf()
+        passphrase.fill('\u0000')
+        val job = viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
             var candidateKey: ByteArray? = null
             try {
                 candidateKey = withContext(Dispatchers.Default) {
@@ -150,11 +153,14 @@ internal class MainViewModel @Inject constructor(
                 )
             } finally {
                 candidateKey?.fill(0)
-                chars.fill('\u0000')
-                onUnlockFinished()
             }
         }
-        return authenticationJob
+        job.invokeOnCompletion {
+            chars.fill('\u0000')
+            onUnlockFinished()
+        }
+        authenticationJob = job
+        return job
     }
 
     fun submitPin(pin: CharArray, isArabic: Boolean): Job? {
@@ -168,13 +174,15 @@ internal class MainViewModel @Inject constructor(
         activePinSubmissionId = attemptId
         val chars = pin.copyOf()
         pin.fill('\u0000')
-        val job = viewModelScope.launch {
+        val job = viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            var creatingPin = false
             try {
                 withContext(Dispatchers.Default) {
                     if (!isCurrentPinAttempt(generation, attemptId)) return@withContext
                     _uiState.update { it.copy(unlockErrorMessage = null) }
                     val currentMode = _uiState.value.pinMode
                     if (currentMode == PinFieldMode.CREATE) {
+                        creatingPin = true
                         synchronized(lifecycleLock) {
                             if (!isCurrentPinAttempt(generation, attemptId)) return@withContext
                             val currentCreatedPin = createdPin
@@ -204,9 +212,6 @@ internal class MainViewModel @Inject constructor(
                                     }
                                     appPinManager.setPin(chars)
                                     localKeyManager.setUnlockMethod(LocalKeyManager.METHOD_PIN)
-                                } catch (e: Exception) {
-                                    localKeyManager.clearPinUnlockKey()
-                                    throw e
                                 } finally {
                                     sessionKey.fill(0)
                                 }
@@ -271,21 +276,39 @@ internal class MainViewModel @Inject constructor(
                     }
                 }
             } catch (_: CancellationException) {
+                val cleanupFailure = if (creatingPin) rollbackPinSetup() else null
                 if (isCurrentPinAttempt(generation, attemptId)) {
-                    failClosed(generation)
+                    failClosed(
+                        generation = generation,
+                        unlockScreen = MainUiState.UnlockScreen.PIN,
+                        errorMessage = if (cleanupFailure == null) null else "Unable to securely cancel PIN setup",
+                    )
                 }
             } catch (e: Exception) {
+                val cleanupFailure = if (creatingPin) rollbackPinSetup() else null
+                cleanupFailure?.let(e::addSuppressed)
                 if (isCurrentPinAttempt(generation, attemptId)) {
                     val mismatch = isDatabaseVersionMismatch(e)
                     failClosed(
                         generation = generation,
                         unlockScreen = if (mismatch) null else MainUiState.UnlockScreen.PIN,
-                        errorMessage = if (mismatch) null else "Unable to unlock with PIN",
+                        errorMessage = if (mismatch) {
+                            null
+                        } else if (cleanupFailure != null) {
+                            "Unable to securely complete PIN setup"
+                        } else {
+                            "Unable to unlock with PIN"
+                        },
                         databaseBlocked = mismatch,
                     )
                 }
             } finally {
                 chars.fill('\u0000')
+            }
+        }
+        job.invokeOnCompletion {
+            chars.fill('\u0000')
+            synchronized(lifecycleLock) {
                 if (activePinSubmissionId == attemptId) {
                     activePinSubmissionId = null
                     pinSubmissionInFlight = false
@@ -314,7 +337,7 @@ internal class MainViewModel @Inject constructor(
             sessionKey.fill(0)
             return null
         }
-        val job = viewModelScope.launch {
+        val job = viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
             try {
                 if (!isCurrentBiometricAttempt(generation, attemptId)) return@launch
                 protectedDatabaseValidator.validate(sessionKey)
@@ -341,6 +364,7 @@ internal class MainViewModel @Inject constructor(
                 sessionKey.fill(0)
             }
         }
+        job.invokeOnCompletion { sessionKey.fill(0) }
         return job
     }
 
@@ -403,9 +427,10 @@ internal class MainViewModel @Inject constructor(
         activeBiometricAttemptId = null
         databaseWarmJob?.cancel()
         _uiState.update { it.copy(unlocked = false, isWarmingDatabase = true) }
-        databaseWarmJob = viewModelScope.launch {
+        databaseWarmJob = viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
             val result = try {
-                warmDatabase?.invoke()
+                val warmer = warmDatabase ?: error("Protected database warmer is not configured")
+                warmer.invoke()
                 Result.success(Unit)
             } catch (_: CancellationException) {
                 if (generation == lifecycleGeneration) failClosed(generation)
@@ -538,6 +563,30 @@ internal class MainViewModel @Inject constructor(
         } finally {
             key.fill(0)
         }
+    }
+
+    /** Restores the only safe recoverable state when PIN setup cannot finish. */
+    private fun rollbackPinSetup(): Throwable? {
+        var cleanupFailure: Throwable? = null
+        fun cleanup(action: () -> Unit) {
+            try {
+                action()
+            } catch (failure: Throwable) {
+                cleanupFailure?.addSuppressed(failure) ?: run { cleanupFailure = failure }
+            }
+        }
+
+        // The local cache and metadata move together. If either persistence API
+        // fails, still remove the other credential so no usable PIN state remains.
+        cleanup { localKeyManager.clearPinUnlockConfiguration() }
+        cleanup { appPinManager.clearPin() }
+        clearPendingPin()
+        return cleanupFailure
+    }
+
+    private fun clearPendingPin() = synchronized(lifecycleLock) {
+        createdPin?.fill('\u0000')
+        createdPin = null
     }
 
     override fun onCleared() {

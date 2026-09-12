@@ -162,4 +162,16 @@ class LocalKeyManagerTest {
         // The session cache is untouched and still recoverable.
         assertArrayEquals(setupKey, keyManager.cachedSessionKey())
     }
+
+    @Test
+    fun `clearPinUnlockConfiguration atomically falls back to passphrase`() {
+        val setupKey = keyManager.setupPassphrase("pin-unlock-configuration".toCharArray())
+        keyManager.cachePinUnlockKey(setupKey)
+        keyManager.setUnlockMethod(LocalKeyManager.METHOD_PIN)
+
+        keyManager.clearPinUnlockConfiguration()
+
+        assertNull(keyManager.cachedPinUnlockKey())
+        assertEquals(LocalKeyManager.METHOD_PASSPHRASE, keyManager.unlockMethod())
+    }
 }
