@@ -52,22 +52,63 @@ object YonteAppModule {
 
     @Provides
     @Singleton
+    internal fun provideProtectedDatabaseValidator(
+        @ApplicationContext context: Context,
+    ): ProtectedDatabaseValidator = ProtectedDatabaseValidator { candidateKey ->
+        val database = YonteDatabase.openForValidation(context, candidateKey)
+        try {
+            database.noteDao().getAll()
+        } finally {
+            database.close()
+        }
+    }
+
+    @Provides
+    @Singleton
     fun provideDatabase(
         @ApplicationContext context: Context,
         localKeyManager: LocalKeyManager,
     ): YonteDatabase {
         val key = localKeyManager.cachedSessionKey()
             ?: error("YonteDatabase requested before onboarding/unlock completed")
-        return YonteDatabase.get(context, key)
+        return try {
+            YonteDatabase.get(context, key) {
+                isCurrentSessionKey(localKeyManager, key)
+            }
+        } finally {
+            key.fill(0)
+        }
     }
 
     @Provides
     @Singleton
-    fun provideNoteRepository(database: YonteDatabase): NoteRepository = NoteRepository(database)
+    fun provideNoteRepository(
+        @ApplicationContext context: Context,
+        localKeyManager: LocalKeyManager,
+    ): NoteRepository = NoteRepository {
+        val key = localKeyManager.cachedSessionKey()
+            ?: error("YonteDatabase requested before onboarding/unlock completed")
+        try {
+            YonteDatabase.get(context, key) {
+                isCurrentSessionKey(localKeyManager, key)
+            }
+        } finally {
+            key.fill(0)
+        }
+    }
 
     @Provides
     @Singleton
     fun provideBackupGateway(encryptionManager: EncryptionManager): BackupGateway = BackupService(encryptionManager)
+
+    private fun isCurrentSessionKey(localKeyManager: LocalKeyManager, key: ByteArray): Boolean {
+        val current = localKeyManager.cachedSessionKey() ?: return false
+        return try {
+            current.contentEquals(key)
+        } finally {
+            current.fill(0)
+        }
+    }
 
     @Provides
     @Singleton

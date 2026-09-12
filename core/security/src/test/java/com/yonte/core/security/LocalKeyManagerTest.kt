@@ -78,6 +78,16 @@ class LocalKeyManagerTest {
     }
 
     @Test
+    fun `unlock derives a candidate without replacing the committed session cache`() {
+        val committedKey = keyManager.setupPassphrase("right-passphrase".toCharArray())
+        val candidate = keyManager.unlock("wrong-passphrase".toCharArray())
+
+        assertFalse(committedKey.contentEquals(candidate))
+        assertArrayEquals(committedKey, keyManager.cachedSessionKey())
+        candidate.fill(0)
+    }
+
+    @Test
     fun `currentSalt returns null before setup and the salt after`() {
         assertNull(keyManager.currentSalt())
         keyManager.setupPassphrase("salt-test".toCharArray())
@@ -151,5 +161,17 @@ class LocalKeyManagerTest {
         assertNull(keyManager.cachedPinUnlockKey())
         // The session cache is untouched and still recoverable.
         assertArrayEquals(setupKey, keyManager.cachedSessionKey())
+    }
+
+    @Test
+    fun `clearPinUnlockConfiguration atomically falls back to passphrase`() {
+        val setupKey = keyManager.setupPassphrase("pin-unlock-configuration".toCharArray())
+        keyManager.cachePinUnlockKey(setupKey)
+        keyManager.setUnlockMethod(LocalKeyManager.METHOD_PIN)
+
+        keyManager.clearPinUnlockConfiguration()
+
+        assertNull(keyManager.cachedPinUnlockKey())
+        assertEquals(LocalKeyManager.METHOD_PASSPHRASE, keyManager.unlockMethod())
     }
 }

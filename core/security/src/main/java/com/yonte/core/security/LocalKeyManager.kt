@@ -18,20 +18,18 @@ class LocalKeyManager(context: Context, private val cacheManager: SessionKeyCiph
         return derived.key
     }
 
-    /** Called on every cold start after onboarding. Re-derives the key from the
-     * passphrase the user re-enters (or from the cached wrapped key after a
-     * biometric/PIN unlock — wiring for that convenience layer is out of scope for
-     * this task and tracked separately in ROADMAP.md). */
+    /** Derives a candidate key without committing it to session state.
+     * The caller must validate the candidate against protected storage before
+     * caching it. The returned mutable array is caller-owned and must be cleared
+     * after use.
+     */
     fun unlock(passphrase: CharArray): ByteArray {
         val salt = Base64.decode(
             prefs.getString(KEY_SALT, null) ?: error("setupPassphrase() was never called"),
             Base64.NO_WRAP,
         )
-        val key = Argon2Kdf.deriveWithSalt(passphrase, salt)
-        cacheSessionKey(key)
-        return key
+        return Argon2Kdf.deriveWithSalt(passphrase, salt)
     }
-
     /** Returns the raw salt bytes, or null before first-run setup. */
     fun currentSalt(): ByteArray? =
         prefs.getString(KEY_SALT, null)?.let { Base64.decode(it, Base64.NO_WRAP) }
@@ -116,6 +114,15 @@ class LocalKeyManager(context: Context, private val cacheManager: SessionKeyCiph
 
     fun clearPinUnlockKey() {
         prefs.edit().remove(KEY_PIN_UNLOCK_CACHE).apply()
+    }
+
+    /** Atomically disables PIN unlock by removing its key cache and selecting the
+     * passphrase fallback in one preferences transaction. */
+    fun clearPinUnlockConfiguration() {
+        prefs.edit()
+            .remove(KEY_PIN_UNLOCK_CACHE)
+            .putString(KEY_UNLOCK_METHOD, METHOD_PASSPHRASE)
+            .apply()
     }
 
     companion object {

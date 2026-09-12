@@ -1,5 +1,42 @@
 # Changelog
 
+## Unreleased — P0: fail closed during final unlock cleanup (2026-09-12)
+
+- `app/.../MainViewModel.kt`, `core/security/.../LocalKeyManager.kt`, `app/src/test/.../MainViewModelTest.kt`, `core/security/src/test/.../LocalKeyManagerTest.kt`: take passphrase ownership before launching, register completion cleanup for PIN and biometric buffers, and start owned unlock jobs undispatched so cancellation cannot bypass cleanup; reject an absent protected-database warmer, atomically roll back PIN cache/method metadata and credentials on setup failure without suppressing cleanup errors, then fail closed even when cleanup reports errors; cover teardown secret cleanup deterministically.
+- `core/security/.../AppPinManager.kt`, `core/security/src/test/.../AppPinManagerTest.kt`: zero derived PIN material after persistence and provide tested complete-PIN rollback for interrupted setup. (implementation commit: pending)
+
+## Unreleased — P0: close final lifecycle review blockers (2026-09-10)
+
+- `app/.../MainViewModel.kt`: serialize ViewModel teardown and PIN setup with lifecycle commits, keep the UI locked while protected database warming runs, and reject stale biometric fallback callbacks.
+- `app/.../MainActivity.kt`, `app/.../YonteAppModule.kt`: show protected warm progress before unlock publication and keep the validator implementation internal for Kotlin compilation.
+- `core/database/.../YonteDatabase.kt`, `core/database/src/androidTest/.../YonteDatabaseEncryptionTest.kt`: open replacement candidates before replacing the active singleton and verify invalid candidates preserve the valid instance.
+- `app/src/test/.../MainViewModelTest.kt`: add deterministic passphrase, biometric rejection, warm gating, cancellation, and secret cleanup regression coverage. (implementation commits: 075a71d, 9ef7364, 9d58dd5, 92345a6, dc64c63, d543170, c06bd07, 7c33420, 0f91fcf)
+
+## Unreleased — P0: close post-review authentication races (2026-09-10)
+
+- `app/.../MainViewModel.kt`: bind PIN and biometric operations to lifecycle generations, validate PIN and biometric candidates through a non-publishing protected database open before session commit, serialize commit with invalidation, and fail closed on authentication and warming failures.
+- `app/.../MainActivity.kt`, `app/.../YonteAppModule.kt`, `core/database/.../YonteDatabase.kt`: invalidate late biometric callbacks, reject repository access after session invalidation, and keep validation candidates out of the process singleton.
+- `app/src/test/.../MainViewModelTest.kt`, `core/database/src/androidTest/.../YonteDatabaseEncryptionTest.kt`: add deterministic stale-callback and candidate-validation regression coverage. (implementation commits: 485901e, 6f42c19, b6d82e3, 62b67ab, 4a163e3, ce47608, dfa4eda, 5f70554, b2b4589)
+
+## Unreleased — P0: complete key lifecycle cleanup paths (2026-09-10)
+
+- `app/.../MainViewModel.kt`: clear onboarding return values, track and cancel PIN submissions, isolate each unlock warm operation by lifecycle generation, close the protected database on ViewModel teardown, and clear pending PIN state during invalidation.
+- `app/.../YonteAppModule.kt`: clear the database provider's caller-owned session-key buffer after database acquisition.
+- `app/src/test/.../MainViewModelTest.kt`: install a test Main dispatcher, await asynchronous PIN state transitions, and cover repeated unlock attempts. (implementation commits: 705994d, 57c2ced, 6ab2c19, d9caada, 491dd6d, 6ccee05, 1ee226b, ae55a9f, 40083e4, 12bd8a5, bec5b48, 632d82c, 73ae3d2, 9dc0562, 14d3cf1, df38005, 5a09ab4, 13d9e27, ea444e8)
+
+## Unreleased — P0: close lifecycle review findings (2026-09-10)
+
+- `app/.../MainActivity.kt`: force the database warmer to execute a protected query so SQLCipher opening and migration failures are observed before the app remains unlocked.
+- `app/.../MainViewModel.kt`: guard authentication and warming jobs with a lifecycle generation, cancel stale work during invalidation, and prevent a late job from clearing a newer session.
+- `core/database/.../NoteRepository.kt`, `app/.../YonteAppModule.kt`: resolve the Hilt repository against the active database singleton so lock/unlock can safely close and reopen the protected database.
+- `app/.../MainViewModelTest.kt`, `.github/workflows/android.yml`: correct the app test fixture/assertion and include `:app:test` in CI. (implementation commits: 4e620ff, d3e9922, cdf5ae7, 0a9bd30, 17b664d, 13276f7)
+
+## Unreleased — P0: harden session key ownership and cleanup (2026-09-10)
+
+- `app/.../MainViewModel.kt`: derive passphrase candidates without caching them before protected database validation; clear candidate, PIN, and backup key buffers on completion; fail closed on database warm failures; and add explicit session invalidation that closes the database and clears the interactive cache.
+- `core/security/.../LocalKeyManager.kt`: `unlock()` now derives a caller-owned candidate without committing it to session state.
+- `app/src/test/.../MainViewModelTest.kt`, `core/security/src/test/.../LocalKeyManagerTest.kt`: add coverage for failed database warming, session invalidation, and uncommitted candidate keys. (implementation commits: a80243b, 766a702, 0df51f3, bffcb04)
+
 ## Unreleased — Run foundation PRs through Android CI (2026-09-09)
 
 - `.github/workflows/android.yml`: the pull-request trigger now covers

@@ -44,6 +44,17 @@ class AppPinManagerTest {
     }
 
     @Test
+    fun `clearPin removes a complete PIN credential`() {
+        val manager = createManager()
+        manager.setPin("1234".toCharArray())
+
+        manager.clearPin()
+
+        assertFalse(manager.isPinSet())
+        assertFalse(manager.verify("1234".toCharArray()))
+    }
+
+    @Test
     fun `correct PIN verifies after setPin`() {
         val manager = createManager()
         manager.setPin("1234".toCharArray())

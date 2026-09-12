@@ -62,6 +62,7 @@ class MainActivity : FragmentActivity() {
     private var darkTheme by mutableStateOf(false)
     private var showSettings by mutableStateOf(false)
     private var isUnlocking by mutableStateOf(false)
+    private var biometricPrompt: BiometricPrompt? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -69,7 +70,7 @@ class MainActivity : FragmentActivity() {
         sharedText = intent.sharedText()
 
         viewModel.setDatabaseWarmer {
-            withContext(Dispatchers.IO) { noteRepository.get() }
+            withContext(Dispatchers.IO) { noteRepository.get().getAll() }
         }
 
         val biometricAvailable = BiometricManager.from(this)
@@ -134,7 +135,7 @@ class MainActivity : FragmentActivity() {
                         onTriggerBiometric = ::launchBiometricPrompt,
                         onUseFallbackInstead = { viewModel.switchToPinOrPassphrase() },
                     )
-                    uiState.unlocked && uiState.isWarmingDatabase -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    uiState.isWarmingDatabase -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
                     }
                     uiState.unlocked -> NotesOrSettings()
@@ -147,36 +148,35 @@ class MainActivity : FragmentActivity() {
         resources.configuration.layoutDirection == android.util.LayoutDirection.RTL
 
     private fun launchBiometricPrompt() {
+        val attemptId = viewModel.beginBiometricUnlock()
         viewModel.clearUnlockError()
         val executor = ContextCompat.getMainExecutor(this)
         val callback = object : BiometricPrompt.AuthenticationCallback() {
             override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                 super.onAuthenticationSucceeded(result)
+                biometricPrompt = null
                 try {
                     val cryptoCipher = result.cryptoObject?.cipher
                     if (cryptoCipher != null) {
                         try {
                             val sessionKey = biometricUnlockManager.unwrapSessionKey(cryptoCipher)
-                            viewModel.handleBiometricUnlockSuccess(sessionKey)
+                            viewModel.handleBiometricUnlockSuccess(sessionKey, attemptId)
                         } catch (_: Exception) {
-                            // Decryption failed (missing or corrupted cache) — fall back
-                            biometricUnlockManager.clearEnrolledKey()
-                            localKeyManager.setUnlockMethod(
-                                if (appPinManager.isPinSet()) LocalKeyManager.METHOD_PIN else LocalKeyManager.METHOD_PASSPHRASE,
-                            )
-                            viewModel.switchToPinOrPassphrase()
+                            // Decryption failed (missing or corrupted cache) — fall back.
+                            viewModel.handleBiometricUnlockFallback(attemptId)
                         }
                     } else {
-                        viewModel.handleBiometricUnlockFailure(isArabic())
+                        viewModel.handleBiometricUnlockFailure(isArabic(), attemptId)
                     }
                 } catch (_: Exception) {
-                    viewModel.handleBiometricUnlockFailure(isArabic())
+                    viewModel.handleBiometricUnlockFailure(isArabic(), attemptId)
                 }
             }
 
             override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                 super.onAuthenticationError(errorCode, errString)
-                viewModel.handleBiometricUnlockError(errorCode, errString)
+                biometricPrompt = null
+                viewModel.handleBiometricUnlockError(errorCode, errString, attemptId)
             }
         }
 
@@ -189,30 +189,25 @@ class MainActivity : FragmentActivity() {
         val cipher = biometricUnlockManager.buildDecryptCipher()
         if (cipher != null) {
             try {
-                BiometricPrompt(this, executor, callback).authenticate(
+                biometricPrompt = BiometricPrompt(this, executor, callback)
+                biometricPrompt?.authenticate(
                     promptInfo,
                     BiometricPrompt.CryptoObject(cipher),
                 )
             } catch (e: Exception) {
+                biometricPrompt = null
                 if (e is android.security.keystore.KeyPermanentlyInvalidatedException ||
                     generateSequence(e as Throwable?) { it.cause }.any { it is android.security.keystore.KeyPermanentlyInvalidatedException }
                 ) {
-                    biometricUnlockManager.clearEnrolledKey()
-                    localKeyManager.setUnlockMethod(
-                        if (appPinManager.isPinSet()) LocalKeyManager.METHOD_PIN else LocalKeyManager.METHOD_PASSPHRASE,
-                    )
-                    viewModel.switchToPinOrPassphrase()
+                    viewModel.handleBiometricUnlockFallback(attemptId)
                 } else {
-                    viewModel.handleBiometricUnlockFailure(isArabic())
+                    biometricPrompt = null
+                    viewModel.handleBiometricUnlockFailure(isArabic(), attemptId)
                 }
             }
         } else {
-            // No IV stored — biometric key is missing or never enrolled
-            biometricUnlockManager.clearEnrolledKey()
-            localKeyManager.setUnlockMethod(
-                if (appPinManager.isPinSet()) LocalKeyManager.METHOD_PIN else LocalKeyManager.METHOD_PASSPHRASE,
-            )
-            viewModel.switchToPinOrPassphrase()
+            // No IV stored — biometric key is missing or never enrolled.
+            viewModel.handleBiometricUnlockFallback(attemptId)
         }
     }
 
@@ -342,6 +337,13 @@ class MainActivity : FragmentActivity() {
                 onOpenSettings = { showSettings = true },
             )
         }
+    }
+
+    override fun onDestroy() {
+        biometricPrompt?.cancelAuthentication()
+        biometricPrompt = null
+        viewModel.invalidateSession()
+        super.onDestroy()
     }
 
     override fun onNewIntent(intent: Intent) {

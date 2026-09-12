@@ -12,11 +12,26 @@ class AppPinManager(context: Context) {
 
     fun setPin(pin: CharArray) {
         val derived = Argon2Kdf.deriveNewKey(pin)
+        try {
+            prefs.edit()
+                .putString(KEY_HASH, Base64.encodeToString(derived.key, Base64.NO_WRAP))
+                .putString(KEY_SALT, Base64.encodeToString(derived.salt, Base64.NO_WRAP))
+                .putInt(KEY_ATTEMPTS, 0)
+                .putLong(KEY_LOCKOUT_UNTIL, 0L)
+                .apply()
+        } finally {
+            derived.key.fill(0)
+            derived.salt.fill(0)
+        }
+    }
+
+    /** Removes every PIN-authentication value so callers can roll back an incomplete setup. */
+    fun clearPin() {
         prefs.edit()
-            .putString(KEY_HASH, Base64.encodeToString(derived.key, Base64.NO_WRAP))
-            .putString(KEY_SALT, Base64.encodeToString(derived.salt, Base64.NO_WRAP))
-            .putInt(KEY_ATTEMPTS, 0)
-            .putLong(KEY_LOCKOUT_UNTIL, 0L)
+            .remove(KEY_HASH)
+            .remove(KEY_SALT)
+            .remove(KEY_ATTEMPTS)
+            .remove(KEY_LOCKOUT_UNTIL)
             .apply()
     }
 
