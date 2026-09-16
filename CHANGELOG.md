@@ -12,6 +12,9 @@
   the `room-schema-bootstrap` artifact only for Draft pull requests, immediately
   after Kotlin compilation, so the Draft PR can supply Room/KSP's generated v1
   schema for review and commit.
+- `.github/workflows/android.yml`: configure both `setup-android@v3` steps to
+  request `platform-tools` explicitly, avoiding the obsolete default `tools`
+  package that failed before Gradle started in Android CI.
 - `core/database/src/androidTest/.../YonteDatabaseEncryptionTest.kt`: cover fresh
   encrypted-database creation of the existing manual `notes_fts` table when FTS5 is
   available; FTS5-unavailable fallback behavior remains accepted. SQLCipher
