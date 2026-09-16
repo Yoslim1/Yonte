@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased — P1: configure Room schema migration baseline (2026-09-10)
+
+- `core/database/build.gradle.kts`, `core/database/schemas/.gitkeep`,
+  `gradle/libs.versions.toml`, and
+  `core/database/src/androidTest/.../YonteDatabaseSchemaBaselineTest.kt`: configure
+  cache-correct Room schema export through KSP, keep its required input directory
+  source-controlled, expose it as instrumentation-test assets, and add a v1 schema
+  baseline test using `MigrationTestHelper` with reliable temporary-database cleanup.
+- `.github/workflows/android.yml`: temporarily upload the Room schema directory as
+  the `room-schema-bootstrap` artifact only for Draft pull requests, immediately
+  after Kotlin compilation, so the Draft PR can supply Room/KSP's generated v1
+  schema for review and commit.
+- `core/database/src/androidTest/.../YonteDatabaseEncryptionTest.kt`: cover fresh
+  encrypted-database creation of the existing manual `notes_fts` table when FTS5 is
+  available; FTS5-unavailable fallback behavior remains accepted. SQLCipher
+  configuration, the database version, and production FTS5 behavior are unchanged.
+- The generated v1 Room schema remains pending because this working environment lacks
+  the Gradle and Room/KSP artifacts needed to generate it; no schema JSON was
+  hand-authored.
+
 ## Unreleased — Run foundation PRs through Android CI (2026-09-09)
 
 - `.github/workflows/android.yml`: the pull-request trigger now covers

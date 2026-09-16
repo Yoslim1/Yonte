@@ -1,8 +1,10 @@
 package com.yonte.core.database
 
 import android.content.Context
+import android.database.SQLException
 import android.database.sqlite.SQLiteException
 import androidx.room.Room
+import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.security.SecureRandom
@@ -48,6 +50,28 @@ class YonteDatabaseEncryptionTest {
     }
 
     @Test
+    fun freshEncryptedDatabaseCreatesManualFtsTableWhenFts5IsAvailable() {
+        System.loadLibrary("sqlcipher")
+        YonteDatabase.close()
+        context.deleteDatabase("yonte.db")
+        val key = ByteArray(32).also { SecureRandom().nextBytes(it) }
+
+        try {
+            val database = YonteDatabase.get(context, key)
+            val sqliteDatabase = database.openHelper.writableDatabase
+
+            assertEquals(
+                "A fresh database must create notes_fts exactly when FTS5 is available",
+                sqliteDatabase.supportsFts5(),
+                sqliteDatabase.hasManualNotesFtsTable(),
+            )
+        } finally {
+            YonteDatabase.close()
+            context.deleteDatabase("yonte.db")
+        }
+    }
+
+    @Test
     fun encryptedDatabaseOpensWithCorrectKeyAndRejectsWrongKey() = runBlocking {
         System.loadLibrary("sqlcipher")
         context.deleteDatabase(dbName)
@@ -76,4 +100,26 @@ class YonteDatabaseEncryptionTest {
             context.deleteDatabase(dbName)
         }
     }
+
+    private fun SupportSQLiteDatabase.supportsFts5(): Boolean =
+        try {
+            execSQL("CREATE VIRTUAL TABLE temp.yonte_fts5_capability_check USING fts5(content)")
+            true
+        } catch (_: SQLException) {
+            false
+        } finally {
+            try {
+                execSQL("DROP TABLE IF EXISTS temp.yonte_fts5_capability_check")
+            } catch (_: SQLException) {
+                // The probe must not turn unsupported FTS5 into a test cleanup failure.
+            }
+        }
+
+    private fun SupportSQLiteDatabase.hasManualNotesFtsTable(): Boolean =
+        query(
+            "SELECT 1 FROM sqlite_master WHERE type = ? AND name = ?",
+            arrayOf("table", "notes_fts"),
+        ).use { cursor ->
+            cursor.moveToFirst()
+        }
 }
