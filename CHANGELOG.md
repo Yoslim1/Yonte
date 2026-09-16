@@ -2,16 +2,17 @@
 
 ## Unreleased — P1: configure Room schema migration baseline (2026-09-10)
 
-- `core/database/build.gradle.kts`, `core/database/schemas/.gitkeep`,
-  `gradle/libs.versions.toml`, and
+- `core/database/build.gradle.kts`, `gradle/libs.versions.toml`, and
   `core/database/src/androidTest/.../YonteDatabaseSchemaBaselineTest.kt`: configure
-  cache-correct Room schema export through KSP, keep its required input directory
-  source-controlled, expose it as instrumentation-test assets, and add a v1 schema
-  baseline test using `MigrationTestHelper` with reliable temporary-database cleanup.
-- `.github/workflows/android.yml`: temporarily upload the Room schema directory as
-  the `room-schema-bootstrap` artifact only for Draft pull requests, immediately
-  after Kotlin compilation, so the Draft PR can supply Room/KSP's generated v1
-  schema for review and commit.
+  Room schema export through KSP into the optional, ignored
+  `build/room-schema-bootstrap` directory created at task execution, while reserving
+  `schemas` as the Android-test asset source for the reviewed, committed schema JSON;
+  add a v1 schema baseline test using `MigrationTestHelper` with reliable
+  temporary-database cleanup.
+- `.github/workflows/android.yml`: on Draft pull requests only, rerun
+  `:core:database:kspDebugKotlin` before uploading
+  `core/database/build/room-schema-bootstrap` as the `room-schema-bootstrap` artifact,
+  ensuring the Draft PR supplies Room/KSP's generated v1 schema for review and commit.
 - `.github/workflows/android.yml`: configure both `setup-android@v3` steps to
   request `platform-tools` explicitly, avoiding the obsolete default `tools`
   package that failed before Gradle started in Android CI.

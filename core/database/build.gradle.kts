@@ -1,10 +1,12 @@
 import java.io.File
 import org.gradle.api.tasks.InputDirectory
+import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.process.CommandLineArgumentProvider
 
 class RoomSchemaArgProvider(
+    @get:Optional
     @get:InputDirectory
     @get:PathSensitive(PathSensitivity.RELATIVE)
     val schemaDir: File,
@@ -18,6 +20,9 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.ksp)
 }
+
+// Room/KSP creates this optional bootstrap location at task execution, never in source assets.
+val roomSchemaBootstrapDirectory = layout.buildDirectory.dir("room-schema-bootstrap").get().asFile
 
 android {
     namespace = "com.yonte.core.database"
@@ -37,7 +42,7 @@ android {
 }
 
 ksp {
-    arg(RoomSchemaArgProvider(File(projectDir, "schemas")))
+    arg(RoomSchemaArgProvider(roomSchemaBootstrapDirectory))
 }
 
 dependencies {
