@@ -4,11 +4,11 @@
 
 - `core/database/build.gradle.kts`, `gradle/libs.versions.toml`, and
   `core/database/src/androidTest/.../YonteDatabaseSchemaBaselineTest.kt`: configure
-  Room schema export through KSP into the optional, ignored
-  `build/room-schema-bootstrap` directory created at task execution, while reserving
-  `schemas` as the Android-test asset source for the reviewed, committed schema JSON;
-  add a v1 schema baseline test using `MigrationTestHelper` with reliable
-  temporary-database cleanup.
+  Room schema export through KSP into the ignored `build/room-schema-bootstrap`
+  directory, prepared at task execution by a module-local declared-output task before
+  every `ksp*Kotlin` task; reserve `schemas` as the Android-test asset source for the
+  reviewed, committed schema JSON, and add a v1 schema baseline test using
+  `MigrationTestHelper` with reliable temporary-database cleanup.
 - `.github/workflows/android.yml`: on Draft pull requests only, rerun
   `:core:database:kspDebugKotlin` before uploading
   `core/database/build/room-schema-bootstrap` as the `room-schema-bootstrap` artifact,
