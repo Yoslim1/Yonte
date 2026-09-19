@@ -2,17 +2,15 @@
 
 ## Unreleased — P1: configure Room schema migration baseline (2026-09-10)
 
-- `core/database/build.gradle.kts`, `gradle/libs.versions.toml`, and
+- `core/database/build.gradle.kts`,
+  `core/database/schemas/com.yonte.core.database.YonteDatabase/1.json`,
+  `gradle/libs.versions.toml`, and
   `core/database/src/androidTest/.../YonteDatabaseSchemaBaselineTest.kt`: configure
-  Room schema export through KSP into the ignored `build/room-schema-bootstrap`
-  directory, prepared at task execution by a module-local declared-output task before
-  every `ksp*Kotlin` task; reserve `schemas` as the Android-test asset source for the
-  reviewed, committed schema JSON, and add a v1 schema baseline test using
-  `MigrationTestHelper` with reliable temporary-database cleanup.
-- `.github/workflows/android.yml`: on Draft pull requests only, rerun
-  `:core:database:kspDebugKotlin` before uploading
-  `core/database/build/room-schema-bootstrap` as the `room-schema-bootstrap` artifact,
-  ensuring the Draft PR supplies Room/KSP's generated v1 schema for review and commit.
+  Room schema export through KSP into the committed `schemas` directory, expose it as
+  Android-test assets, and commit the Room/KSP-generated v1 schema baseline for
+  `MigrationTestHelper`; no schema JSON was hand-authored.
+- `.github/workflows/android.yml`: remove the temporary Draft-PR KSP rerun and schema
+  bootstrap artifact after committing the generated v1 baseline.
 - `.github/workflows/android.yml`: configure both `setup-android@v3` steps to
   request `platform-tools` explicitly, avoiding the obsolete default `tools`
   package that failed before Gradle started in Android CI.
@@ -20,9 +18,6 @@
   encrypted-database creation of the existing manual `notes_fts` table when FTS5 is
   available; FTS5-unavailable fallback behavior remains accepted. SQLCipher
   configuration, the database version, and production FTS5 behavior are unchanged.
-- The generated v1 Room schema remains pending because this working environment lacks
-  the Gradle and Room/KSP artifacts needed to generate it; no schema JSON was
-  hand-authored.
 
 ## Unreleased — Run foundation PRs through Android CI (2026-09-09)
 

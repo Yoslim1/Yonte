@@ -47,18 +47,6 @@ jobs:
       - name: Check Kotlin and compile debug APK
         run: ./gradlew :core:update:test :core:database:test :core:security:test :core:backup:test :feature:notes:test :feature:onboarding:test :feature:settings:test :app:assembleDebug --stacktrace
 
-      - name: Generate Room schema bootstrap
-        if: github.event_name == 'pull_request' && github.event.pull_request.draft
-        run: ./gradlew :core:database:kspDebugKotlin --rerun-tasks --stacktrace
-
-      - name: Upload Room schema bootstrap artifact
-        if: github.event_name == 'pull_request' && github.event.pull_request.draft
-        uses: actions/upload-artifact@v4
-        with:
-          name: room-schema-bootstrap
-          path: core/database/build/room-schema-bootstrap/
-          if-no-files-found: error
-
       - name: Enable KVM group perms
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules

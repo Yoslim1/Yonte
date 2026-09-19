@@ -19,23 +19,6 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
-val roomSchemaBootstrapDirectory = layout.buildDirectory.dir("room-schema-bootstrap").get().asFile
-
-val prepareRoomSchemaBootstrapDirectory = tasks.register("prepareRoomSchemaBootstrapDirectory") {
-    outputs.dir(roomSchemaBootstrapDirectory)
-    doLast {
-        check(roomSchemaBootstrapDirectory.isDirectory || roomSchemaBootstrapDirectory.mkdirs()) {
-            "Unable to create Room schema bootstrap directory: $roomSchemaBootstrapDirectory"
-        }
-    }
-}
-
-tasks.matching { task ->
-    task.name.startsWith("ksp") && task.name.endsWith("Kotlin")
-}.configureEach {
-    dependsOn(prepareRoomSchemaBootstrapDirectory)
-}
-
 android {
     namespace = "com.yonte.core.database"
     compileSdk = 35
@@ -54,7 +37,7 @@ android {
 }
 
 ksp {
-    arg(RoomSchemaArgProvider(roomSchemaBootstrapDirectory))
+    arg(RoomSchemaArgProvider(File(projectDir, "schemas")))
 }
 
 dependencies {
