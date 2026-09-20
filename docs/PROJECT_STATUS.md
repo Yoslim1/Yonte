@@ -19,7 +19,7 @@ When sources disagree, use this order:
 | Branch | Current role at this snapshot | Commit |
 | --- | --- | --- |
 | main | Existing product baseline. It does not contain the architecture-foundation work described below. | [8517f1c](https://github.com/Yoslim1/Yonte/commit/8517f1c59aa6768699fea5c3467bf99f8aba6aec) |
-| architecture-foundation | Integration baseline for foundation work. It contains the closed Issue #3 fix. | [6d8a591](https://github.com/Yoslim1/Yonte/commit/6d8a59133ea5d5388408cfdc9de54c19e938eb7b) |
+| architecture-foundation | Integration baseline for completed foundation work. It contains the closed Issue #3 fix and the merged Room schema baseline. | [617465e](https://github.com/Yoslim1/Yonte/commit/617465e1b24bb8bb0d786d4960016efae4261bd5) |
 
 Foundation work targets architecture-foundation through focused pull requests. No work is merged directly into main by this documentation change.
 
@@ -27,23 +27,25 @@ Foundation work targets architecture-foundation through focused pull requests. N
 
 ### Issue #3 — biometric enrollment session-key lifetime
 
-[Issue #3](https://github.com/Yoslim1/Yonte/issues/3) is closed. The narrow biometric-enrollment lifetime fix is present at the architecture-foundation head in commit [6d8a591](https://github.com/Yoslim1/Yonte/commit/6d8a59133ea5d5388408cfdc9de54c19e938eb7b).
+[Issue #3](https://github.com/Yoslim1/Yonte/issues/3) is closed. The narrow biometric-enrollment lifetime fix is present on architecture-foundation in commit [6d8a591](https://github.com/Yoslim1/Yonte/commit/6d8a59133ea5d5388408cfdc9de54c19e938eb7b).
 
 The fix is limited to preserving the operation-owned mutable session-key buffer until a terminal biometric callback, then zeroing it once. It does not redesign authentication, rotate cryptography, or change database schema.
 
-## Pending integration and verification
+### Room schema migration baseline
 
-### Issue #4 — Room schema migration baseline
+[PR #29](https://github.com/Yoslim1/Yonte/pull/29) merged into architecture-foundation at [617465e](https://github.com/Yoslim1/Yonte/commit/617465e1b24bb8bb0d786d4960016efae4261bd5).
 
-[Issue #4](https://github.com/Yoslim1/Yonte/issues/4) remains open because [PR #29](https://github.com/Yoslim1/Yonte/pull/29) is still Draft and has not been merged into architecture-foundation.
+The foundation now contains the committed Room v1 schema, KSP schema-export configuration, migration-test support, and explicit platform-tools setup. The final PR head passed [Android CI run 197](https://github.com/Yoslim1/Yonte/actions/runs/35465467832), including Kotlin/unit tests, debug compilation, architecture/changelog gates, encrypted database instrumentation, lint, and APK upload.
 
-PR #29 head [49893bb](https://github.com/Yoslim1/Yonte/commit/49893bb327c365d587bc77058728b8eebf64fcde) has canonical Android CI evidence from [run 197](https://github.com/Yoslim1/Yonte/actions/runs/35465467832): Kotlin/unit tests, debug compilation, architecture guard, changelog gate, encrypted database instrumentation, lint, and APK upload passed. This evidence applies only to that pull-request head until it is reviewed and integrated.
+[Issue #4](https://github.com/Yoslim1/Yonte/issues/4) remains open on GitHub because the merge target is not the default branch. Its implementation is integrated; close the tracker only after the normal post-merge review confirms the foundation state.
 
-### Foundation CI blocker
+## Pending review and verification
 
-The Android CI run triggered by this documentation branch, [run 198](https://github.com/Yoslim1/Yonte/actions/runs/35490342105), failed before Gradle, tests, lint, or instrumentation began. The Setup Android SDK action attempted to install the obsolete SDK package tools, which is no longer available.
+### Documentation current-state cleanup
 
-This is a baseline CI-configuration/environment failure, not a documentation-content failure. PR #29 explicitly requests platform-tools and passed its own canonical CI, but that workflow correction is still pending integration. Do not treat architecture-foundation as currently CI-green until the applicable CI fix is reviewed and merged.
+[PR #30](https://github.com/Yoslim1/Yonte/pull/30) is the documentation cleanup proposal. It must be reviewed and verified against the updated architecture-foundation base before merge.
+
+The obsolete Android SDK tools-package failure seen on the earlier documentation-branch run is corrected in the merged PR #29 workflow. A fresh CI result on the updated documentation PR is required before calling its verification green.
 
 ### Key-lifecycle hardening
 

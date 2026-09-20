@@ -1,3 +1,18 @@
+import java.io.File
+import org.gradle.api.tasks.InputDirectory
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
+import org.gradle.process.CommandLineArgumentProvider
+
+class RoomSchemaArgProvider(
+    @get:InputDirectory
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    val schemaDir: File,
+) : CommandLineArgumentProvider {
+    override fun asArguments(): Iterable<String> =
+        listOf("room.schemaLocation=${schemaDir.path}")
+}
+
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
@@ -16,6 +31,13 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
+    sourceSets {
+        getByName("androidTest").assets.srcDir(File(projectDir, "schemas"))
+    }
+}
+
+ksp {
+    arg(RoomSchemaArgProvider(File(projectDir, "schemas")))
 }
 
 dependencies {
@@ -30,4 +52,5 @@ dependencies {
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.core)
     androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.room.testing)
 }

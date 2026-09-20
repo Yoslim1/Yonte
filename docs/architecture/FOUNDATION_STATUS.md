@@ -21,8 +21,8 @@ These are target constraints and migration decisions. They do not claim the corr
 
 ## Current implementation boundary
 
-- architecture-foundation contains governance documentation and the completed narrow fix for Issue #3; it is not a completed product-architecture migration.
-- Issue #4 is still pending integration through Draft PR #29, so committed Room schema history is not yet part of architecture-foundation.
+- architecture-foundation contains governance documentation, the completed narrow fix for Issue #3, and the merged Room schema/migration-test baseline from PR #29. It is not a completed product-architecture migration.
+- The committed Room v1 schema and migration-test support now satisfy the precondition for future database schema evolution. Future schema work still requires versioned migrations and reviewable compatibility tests.
 - Draft PR #28 is not treated as completed hardening until its independent review and final-SHA CI evidence are complete.
 - Existing production coupling, including Notes presentation persistence leakage, Settings lifecycle/composition debt, and ScheduledBackupWorker infrastructure construction, remains visible until migrated through the defined phases.
 
@@ -39,7 +39,7 @@ Issue #3 is closed; its result is recorded in [Current Security Findings](../sec
 
 ### Evolution safety
 
-- Issue #4 — commit the Room schema-export and migration-test baseline before database/schema evolution.
+- Keep the committed Room schema baseline and migration-test support authoritative for every future database/schema change.
 - Preserve backup compatibility and recovery evidence before high-impact data-platform evolution.
 
 ### Boundary migration
