@@ -1,5 +1,44 @@
 # Changelog
 
+## Unreleased — P1: configure Room schema migration baseline (2026-09-10)
+
+- `core/database/build.gradle.kts`,
+  `core/database/schemas/com.yonte.core.database.YonteDatabase/1.json`,
+  `gradle/libs.versions.toml`, and
+  `core/database/src/androidTest/.../YonteDatabaseSchemaBaselineTest.kt`: configure
+  Room schema export through KSP into the committed `schemas` directory, expose it as
+  Android-test assets, and commit the Room/KSP-generated v1 schema baseline for
+  `MigrationTestHelper`; no schema JSON was hand-authored.
+- `.github/workflows/android.yml`: remove the temporary Draft-PR KSP rerun and schema
+  bootstrap artifact after committing the generated v1 baseline.
+- `.github/workflows/android.yml`: configure both `setup-android@v3` steps to
+  request `platform-tools` explicitly, avoiding the obsolete default `tools`
+  package that failed before Gradle started in Android CI.
+- `core/database/src/androidTest/.../YonteDatabaseEncryptionTest.kt`: cover fresh
+  encrypted-database creation of the existing manual `notes_fts` table when FTS5 is
+  available; FTS5-unavailable fallback behavior remains accepted. SQLCipher
+  configuration, the database version, and production FTS5 behavior are unchanged.
+
+## Unreleased — Run foundation PRs through Android CI (2026-09-09)
+
+- `.github/workflows/android.yml`: the pull-request trigger now covers
+  `architecture-foundation` alongside `main`, allowing Issue #3 fix head
+  `7970e82` to obtain the required canonical Android CI evidence without
+  changing any job, step, or check.
+
+## Unreleased — P0: preserve biometric enrollment key until terminal callback (2026-09-09)
+
+- `app/.../BiometricEnrollmentOperation.kt`, `app/.../MainActivity.kt`: keep the
+  `cachedSessionKey()` buffer alive across asynchronous biometric enrollment,
+  zero it exactly once at terminal completion, and ignore duplicate terminal
+  callbacks. Persistence failures and synchronous setup/start failures report
+  enrollment failure without changing existing PIN/passphrase fallback behavior.
+  (implementation commit: `7970e82`)
+
+## Unreleased — restore SettingsViewModel CI fixture contract (2026-09-09)
+
+- `feature/settings/src/test/.../SettingsViewModelTest.kt`: stub `LocalKeyManager.unlockMethod()` to the production default passphrase method in the shared fixture, preventing Mockito `null` from violating the non-null `SettingsUiState.unlockMethod` contract and allowing the existing backup-frequency tests to exercise their intended behavior. Production behavior is unchanged. (tracking: issue #2)
+
 ## Unreleased — TASK 25: Fix PIN main-thread freeze, biometric unlock stuck state, secure storage hardening (2026-09-08)
 
 - `app/.../MainViewModel.kt`: `submitPin()` now runs Argon2id KDF on `Dispatchers.Default`
