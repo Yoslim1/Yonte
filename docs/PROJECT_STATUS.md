@@ -39,6 +39,12 @@ The fix is limited to preserving the operation-owned mutable session-key buffer 
 
 PR #29 head [49893bb](https://github.com/Yoslim1/Yonte/commit/49893bb327c365d587bc77058728b8eebf64fcde) has canonical Android CI evidence from [run 197](https://github.com/Yoslim1/Yonte/actions/runs/35465467832): Kotlin/unit tests, debug compilation, architecture guard, changelog gate, encrypted database instrumentation, lint, and APK upload passed. This evidence applies only to that pull-request head until it is reviewed and integrated.
 
+### Foundation CI blocker
+
+The Android CI run triggered by this documentation branch, [run 198](https://github.com/Yoslim1/Yonte/actions/runs/35490342105), failed before Gradle, tests, lint, or instrumentation began. The Setup Android SDK action attempted to install the obsolete SDK package tools, which is no longer available.
+
+This is a baseline CI-configuration/environment failure, not a documentation-content failure. PR #29 explicitly requests platform-tools and passed its own canonical CI, but that workflow correction is still pending integration. Do not treat architecture-foundation as currently CI-green until the applicable CI fix is reviewed and merged.
+
 ### Key-lifecycle hardening
 
 [PR #28](https://github.com/Yoslim1/Yonte/pull/28) is open and Draft on branch fix/p0-key-lifecycle-hardening at [c2f7486](https://github.com/Yoslim1/Yonte/commit/c2f7486a8b98e8725af53f15cf7709ec8a914845). It must not be treated as shipped or as closing any security finding until independent review and final-SHA canonical CI evidence are complete.
