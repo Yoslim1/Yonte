@@ -37,7 +37,7 @@ The fix is limited to preserving the operation-owned mutable session-key buffer 
 
 The foundation now contains the committed Room v1 schema, KSP schema-export configuration, migration-test support, and explicit platform-tools setup. The final PR head passed [Android CI run 197](https://github.com/Yoslim1/Yonte/actions/runs/35465467832), including Kotlin/unit tests, debug compilation, architecture/changelog gates, encrypted database instrumentation, lint, and APK upload.
 
-[Issue #4](https://github.com/Yoslim1/Yonte/issues/4) remains open on GitHub because the merge target is not the default branch. Its implementation is integrated; close the tracker only after the normal post-merge review confirms the foundation state.
+[Issue #4](https://github.com/Yoslim1/Yonte/issues/4) is closed with completion evidence after the post-merge foundation verification.
 
 ## Pending review and verification
 
